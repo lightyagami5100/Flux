@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flux — Road Intelligence & Infrastructure Dashboard</title>
+    <!-- Leaflet & MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+           MODERN SAAS DESIGN TOKENS (No AI Slop / Professional Clean)
+           ═══════════════════════════════════════════════════════════════ */
+        :root {
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-heading: 'Plus Jakarta Sans', var(--font-sans);
+            --sidebar-width: 400px;
+            --topbar-height: 60px;
+            --radius-xl: 16px;
+            --radius-lg: 12px;
+            --radius-md: 8px;
+            --radius-sm: 6px;
+            --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* ── Dark Theme (Professional Deep Slate) ── */
+        [data-theme="dark"] {
+            --bg-base: #0B0F17;
+            --bg-surface: rgba(18, 24, 38, 0.85);
+            --bg-surface-elevated: #1E293B;
+            --bg-surface-hover: #26334D;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-focus: #3B82F6;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --text-faint: #64748B;
+            
+            --primary: #3B82F6;
+            --primary-hover: #2563EB;
+            --primary-bg: rgba(59, 130, 246, 0.15);
+
+            --sev-critical: #EF4444;
+            --sev-critical-bg: rgba(239, 68, 68, 0.15);
+            --sev-high: #F97316;
+            --sev-high-bg: rgba(249, 115, 22, 0.15);
+            --sev-medium: #F59E0B;
+            --sev-medium-bg: rgba(245, 158, 11, 0.15);
+            --sev-low: #10B981;
+            --sev-low-bg: rgba(16, 185, 129, 0.15);
+
+            --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+            --shadow-float: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+            --backdrop-blur: blur(20px);
+        }
+
+        /* ── Light Theme (Clean Crisp Minimalist) ── */
+        [data-theme="light"] {
+            --bg-base: #F8FAFC;
+            --bg-surface: rgba(255, 255, 255, 0.88);
+            --bg-surface-elevated: #FFFFFF;
+            --bg-surface-hover: #F1F5F9;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-focus: #2563EB;
+            --text-main: #0F172A;
+            --text-muted: #64748B;
+            --text-faint: #94A3B8;
+
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --primary-bg: rgba(37, 99, 235, 0.1);
+
+            --sev-critical: #DC2626;
+            --sev-critical-bg: rgba(220, 38, 38, 0.1);
+            --sev-high: #EA580C;
+            --sev-high-bg: rgba(234, 88, 12, 0.1);
+            --sev-medium: #D97706;
+            --sev-medium-bg: rgba(217, 119, 6, 0.1);
+            --sev-low: #059669;
+            --sev-low-bg: rgba(5, 150, 105, 0.1);
+
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+            --shadow-float: 0 20px 35px -10px rgba(0, 0, 0, 0.1);
+            --backdrop-blur: blur(20px);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           BASE STYLES
+           ═══════════════════════════════════════════════════════════════ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button, input, select {
+            font-family: inherit;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           LAYOUT ARCHITECTURE
+           ═══════════════════════════════════════════════════════════════ */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        /* Top Navigation Header */
+        .top-navbar {
+            position: absolute;
+            top: 14px;
+            left: calc(var(--sidebar-width) + 30px);
+            right: 20px;
+            height: var(--topbar-height);
+            background: var(--bg-surface);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            transition: var(--transition-smooth);
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--sev-low-bg);
+            color: var(--sev-low);
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 999px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--sev-low);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px var(--sev-low); }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .city-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-surface-elevated);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .city-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .city-btn:hover {
+            color: var(--text-main);
+            background: var(--bg-surface-hover);
+        }
+
+        .city-btn.active {
+            color: var(--primary);
+            background: var(--primary-bg);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 7px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .tool-btn:hover {
+            background: var(--bg-surface-hover);
+            border-color: var(--border-focus);
+        }
+
+        /* ── Floating Left Sidebar (Command Dashboard) ── */
+        .sidebar {
+            position: absolute;
+            top: 14px;
+            bottom: 14px;
+            left: 14px;
+            width: var(--sidebar-width);
+            background: var(--bg-surface);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-float);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), #8B5CF6);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .brand-text h1 {
+            font-family: var(--font-heading);
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-main);
+        }
+
+        .brand-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* KPI Statistics Grid */
+        .kpi-section {
+            padding: 16px 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .kpi-card {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: var(--transition-smooth);
+        }
+
+        .kpi-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .kpi-val-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+
+        .kpi-value {
+            font-family: var(--font-heading);
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .kpi-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Control & Filter Strip */
+        .controls-section {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .filter-chip {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: var(--transition-smooth);
+        }
+
+        .filter-chip:hover {
+            color: var(--text-main);
+            border-color: var(--border-focus);
+        }
+
+        .filter-chip.active {
+            background: var(--primary-bg);
+            color: var(--primary);
+            border-color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Tabs Section */
+        .feed-tabs {
+            display: flex;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            gap: 16px;
+        }
+
+        .feed-tab {
+            padding: 12px 0;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .feed-tab:hover {
+            color: var(--text-main);
+        }
+
+        .feed-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Feed List */
+        .feed-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .feed-container::-webkit-scrollbar {
+            width: 4px;
+        }
+        .feed-container::-webkit-scrollbar-thumb {
+            background: var(--border-subtle);
+            border-radius: 4px;
+        }
+
+        .pothole-card {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 14px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pothole-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .severity-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            background: var(--bg-base);
+            padding: 8px;
+            border-radius: var(--radius-sm);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .stat-val {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* Bottom Action Bar */
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            gap: 10px;
+            background: var(--bg-surface);
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: var(--transition-smooth);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-surface-hover);
+            border-color: var(--border-focus);
+        }
+
+        /* ── Fullscreen Map ── */
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+            background-color: var(--bg-base);
+        }
+
+        /* ── Modern Map Markers & Pulsing Pins ── */
+        .custom-pothole-pin {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .custom-pothole-pin:hover {
+            transform: scale(1.3);
+            z-index: 9999;
+        }
+
+        .custom-cluster-icon {
+            background: var(--bg-surface-elevated);
+            color: var(--text-main);
+            font-family: var(--font-heading);
+            font-size: 12px;
+            font-weight: 700;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ── Modern Pothole Inspector Drawer ── */
+        .drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .drawer-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drawer-content {
+            position: fixed;
+            top: 14px;
+            bottom: 14px;
+            right: 14px;
+            width: 440px;
+            background: var(--bg-surface);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-float);
+            z-index: 2001;
+            transform: translateX(120%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .drawer-overlay.active .drawer-content {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .drawer-title {
+            font-family: var(--font-heading);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .drawer-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: var(--radius-sm);
+        }
+
+        .drawer-close:hover {
+            color: var(--text-main);
+            background: var(--bg-surface-hover);
+        }
+
+        .drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface-elevated);
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .meta-box {
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+        }
+
+        .meta-lbl {
+            font-size: 11px;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .meta-val {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 2px;
+        }
+
+        .timeline-section {
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 14px;
+        }
+
+        .timeline-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .timeline-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-surface-elevated);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        /* ── Leaflet Popup Restyling ── */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-surface-elevated) !important;
+            color: var(--text-main) !important;
+            border-radius: var(--radius-lg) !important;
+            border: 1px solid var(--border-subtle) !important;
+            box-shadow: var(--shadow-float) !important;
+            padding: 0 !important;
+        }
+        .leaflet-popup-content {
+            margin: 14px !important;
+            line-height: 1.4 !important;
+        }
+        .leaflet-popup-tip {
+            background: var(--bg-surface-elevated) !important;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            .sidebar {
+                width: calc(100vw - 28px);
+                height: 45vh;
+                top: auto;
+                bottom: 14px;
+            }
+            .top-navbar {
+                left: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- TOP NAVIGATION BAR -->
+        <header class="top-navbar">
+            <div class="nav-left">
+                <div class="status-pill">
+                    <div class="status-dot"></div>
+                    <span id="live-status-text">Live Radar Active</span>
+                </div>
+                <div class="city-nav">
+                    <button class="city-btn" onclick="flyToCity(33.72, 73.09, 13)">Islamabad</button>
+                    <button class="city-btn" onclick="flyToCity(31.52, 74.35, 13)">Lahore</button>
+                    <button class="city-btn" onclick="flyToCity(24.86, 67.01, 13)">Karachi</button>
+                    <button class="city-btn active" onclick="flyToCity(30.2, 70.0, 6)">All Regions</button>
+                </div>
+            </div>
+
+            <div class="nav-right">
+                <select id="map-style-select" class="tool-btn" onchange="changeMapStyle(this.value)">
+                    <option value="osm-dark">Map: Dark Canvas</option>
+                    <option value="osm-streets">Map: OpenStreetMap Streets</option>
+                    <option value="osm-hot">Map: Humanitarian View</option>
+                    <option value="esri-imagery">Map: Satellite Imagery</option>
+                </select>
+
+                <button class="tool-btn" id="btn-dedup-toggle" onclick="toggleDeduplication()">
+                    <i data-lucide="layers" style="width:14px;height:14px;"></i>
+                    <span id="dedup-label">Canonical (Dedup: ON)</span>
+                </button>
+
+                <button class="tool-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+                    <i data-lucide="sun" id="theme-icon" style="width:14px;height:14px;"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- FLOATING LEFT SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <i data-lucide="activity" style="width:20px;height:20px;"></i>
+                    </div>
+                    <div class="brand-text">
+                        <h1>Flux Intelligence</h1>
+                        <p>Municipal Road Defect Surveillance</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI STATISTICS CARDS -->
+            <div class="kpi-section">
+                <div class="kpi-card">
+                    <span class="kpi-label">Active Potholes</span>
+                    <div class="kpi-val-row">
+                        <span class="kpi-value" id="kpi-total">0</span>
+                        <span class="kpi-badge" style="background:var(--primary-bg);color:var(--primary)">Live</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Critical Hazards</span>
+                    <div class="kpi-val-row">
+                        <span class="kpi-value" id="kpi-critical" style="color:var(--sev-critical)">0</span>
+                        <span class="kpi-badge" style="background:var(--sev-critical-bg);color:var(--sev-critical)">Urgent</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FILTER CONTROLS -->
+            <div class="controls-section">
+                <div class="filter-row">
+                    <button class="filter-chip active" onclick="setSeverityFilter('all', this)">All Severities</button>
+                    <button class="filter-chip" onclick="setSeverityFilter('Critical', this)" style="color:var(--sev-critical)">Critical</button>
+                    <button class="filter-chip" onclick="setSeverityFilter('High', this)" style="color:var(--sev-high)">High</button>
+                    <button class="filter-chip" onclick="setSeverityFilter('Medium', this)" style="color:var(--sev-medium)">Moderate</button>
+                    <button class="filter-chip" onclick="setSeverityFilter('Low', this)" style="color:var(--sev-low)">Minor</button>
+                </div>
+            </div>
+
+            <!-- TABS -->
+            <div class="feed-tabs">
+                <button class="feed-tab active" data-tab="active" onclick="switchTab('active')">Active Registry</button>
+                <button class="feed-tab" data-tab="urgent" onclick="switchTab('urgent')">Urgent Alerts</button>
+            </div>
+
+            <!-- ACTIVITY FEED -->
+            <div class="feed-container" id="feed-container">
+                <!-- Pothole items rendered here -->
+            </div>
+
+            <!-- FOOTER ACTIONS -->
+            <div class="sidebar-footer">
+                <button class="btn-primary" id="btn-seed" onclick="runSimulation()">
+                    <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
+                    <span>Simulate Ingestion</span>
+                </button>
+                <a href="/detections/export/geojson" download="flux_potholes.geojson" class="btn-secondary" title="Export GeoJSON">
+                    <i data-lucide="download" style="width:15px;height:15px;"></i>
+                    <span>GeoJSON</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- FULLSCREEN MAP -->
+        <div id="map"></div>
+    </div>
+
+    <!-- POTHOLE INSPECTOR DRAWER -->
+    <div class="drawer-overlay" id="inspector-overlay" onclick="closeInspector()">
+        <div class="drawer-content" onclick="event.stopPropagation()">
+            <div class="drawer-header">
+                <div class="drawer-title" id="drawer-pothole-title">Pothole Details</div>
+                <button class="drawer-close" onclick="closeInspector()">
+                    <i data-lucide="x" style="width:18px;height:18px;"></i>
+                </button>
+            </div>
+
+            <div class="drawer-body">
+                <img id="drawer-img" class="preview-image" src="" alt="Road Defect Capture" />
+
+                <div class="meta-grid">
+                    <div class="meta-box">
+                        <div class="meta-lbl">Severity Level</div>
+                        <div class="meta-val" id="drawer-sev">High</div>
+                    </div>
+                    <div class="meta-box">
+                        <div class="meta-lbl">Operational Status</div>
+                        <div class="meta-val" id="drawer-status">Active</div>
+                    </div>
+                    <div class="meta-box">
+                        <div class="meta-lbl">Multi-Pass Confirmations</div>
+                        <div class="meta-val" id="drawer-passes">1 Observation</div>
+                    </div>
+                    <div class="meta-box">
+                        <div class="meta-lbl">Model Confidence</div>
+                        <div class="meta-val" id="drawer-conf">95.4%</div>
+                    </div>
+                    <div class="meta-box" style="grid-column: span 2;">
+                        <div class="meta-lbl">GPS Centroid Coordinates</div>
+                        <div class="meta-val" id="drawer-coords">33.7200, 73.0900</div>
+                    </div>
+                </div>
+
+                <div class="timeline-section" id="drawer-timeline-container">
+                    <div class="timeline-title">Observation History</div>
+                    <div id="drawer-timeline-list"></div>
+                </div>
+
+                <div style="margin-top:auto; padding-top:14px; display:flex; gap:10px;" id="drawer-actions">
+                    <!-- Action buttons dynamically inserted -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        // ── APPLICATION STATE ──
+        let geoData = null;
+        let activeTab = 'active';
+        let activeSeverity = 'all';
+        let isDeduplicated = true;
+        let currentMapTileLayer = null;
+        let sseConnection = null;
+
+        // ── 100% FREE MAP TILE PROVIDERS (ZERO API KEYS & NO WATERMARKS) ──
+        const MAP_TILE_PROVIDERS = {
+            'osm-dark': {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+            },
+            'osm-streets': {
+                url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            },
+            'osm-hot': {
+                url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                attribution: '&copy; OpenStreetMap contributors, Humanitarian OSM Team'
+            },
+            'esri-imagery': {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+            }
+        };
+
+        // ── INITIALIZE MAP ──
+        const map = L.map('map', { 
+            zoomControl: false, 
+            attributionControl: false 
+        }).setView([30.2, 70.0], 6);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        function changeMapStyle(styleKey) {
+            const provider = MAP_TILE_PROVIDERS[styleKey] || MAP_TILE_PROVIDERS['osm-dark'];
+            if (currentMapTileLayer) {
+                map.removeLayer(currentMapTileLayer);
+            }
+            currentMapTileLayer = L.tileLayer(provider.url, {
+                maxZoom: 19,
+                subdomains: 'abc'
+            }).addTo(map);
+        }
+
+        // Initialize with default dark canvas
+        changeMapStyle('osm-dark');
+
+        // Marker Cluster Layer
+        const markersClusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 45,
+            iconCreateFunction: function(cluster) {
+                return new L.DivIcon({
+                    html: `<div class="custom-cluster-icon">${cluster.getChildCount()}</div>`,
+                    className: 'custom-cluster-marker',
+                    iconSize: L.point(34, 34)
+                });
+            }
+        });
+        map.addLayer(markersClusterGroup);
+
+        // Viewport Debounced Loading
+        let viewportTimer = null;
+        map.on('moveend', () => {
+            clearTimeout(viewportTimer);
+            viewportTimer = setTimeout(fetchViewportData, 300);
+        });
+
+        // ── THEME SWITCHER ──
+        function toggleTheme() {
+            const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+            const next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('flux-theme', next);
+            
+            const icon = document.getElementById('theme-icon');
+            if (next === 'light') {
+                icon.setAttribute('data-lucide', 'moon');
+                changeMapStyle('osm-streets');
+                document.getElementById('map-style-select').value = 'osm-streets';
+            } else {
+                icon.setAttribute('data-lucide', 'sun');
+                changeMapStyle('osm-dark');
+                document.getElementById('map-style-select').value = 'osm-dark';
+            }
+            lucide.createIcons();
+            renderMap();
+        }
+
+        // ── NAVIGATION HELPERS ──
+        function flyToCity(lat, lon, zoom) {
+            map.flyTo([lat, lon], zoom, { duration: 1.4, easeLinearity: 0.25 });
+        }
+
+        function getSeverityColor(sev) {
+            const s = (sev || '').toLowerCase();
+            if (s === 'critical') return 'var(--sev-critical)';
+            if (s === 'high') return 'var(--sev-high)';
+            if (s === 'medium') return 'var(--sev-medium)';
+            return 'var(--sev-low)';
+        }
+
+        function formatAgo(timestamp) {
+            if (!timestamp) return 'Just now';
+            const diffMin = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
+            if (diffMin < 1) return 'Just now';
+            if (diffMin < 60) return `${diffMin}m ago`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr}h ago`;
+            return `${Math.floor(diffHr / 24)}d ago`;
+        }
+
+        function toggleDeduplication() {
+            isDeduplicated = !isDeduplicated;
+            const lbl = document.getElementById('dedup-label');
+            const btn = document.getElementById('btn-dedup-toggle');
+            if (isDeduplicated) {
+                lbl.textContent = 'Canonical (Dedup: ON)';
+                btn.style.color = 'var(--primary)';
+            } else {
+                lbl.textContent = 'Raw Views (Dedup: OFF)';
+                btn.style.color = 'var(--text-muted)';
+            }
+            fetchViewportData();
+        }
+
+        // ── DATA FETCHING & SYNCHRONIZATION ──
+        async function fetchTelemetry() {
+            try {
+                const res = await fetch('/stats');
+                if (res.ok) {
+                    const stats = await res.json();
+                    document.getElementById('kpi-total').textContent = stats.total_potholes || stats.total || 0;
+                    document.getElementById('kpi-critical').textContent = stats.high || stats.critical || 0;
+                }
+                await fetchViewportData();
+            } catch (e) {
+                console.warn('Telemetry fetch error:', e);
+            }
+        }
+
+        async function fetchViewportData() {
+            const bounds = map.getBounds();
+            const minLat = bounds.getSouth();
+            const maxLat = bounds.getNorth();
+            const minLon = bounds.getWest();
+            const maxLon = bounds.getEast();
+
+            try {
+                const url = `/detections?min_lat=${minLat.toFixed(4)}&max_lat=${maxLat.toFixed(4)}&min_lon=${minLon.toFixed(4)}&max_lon=${maxLon.toFixed(4)}&deduplicated=${isDeduplicated}&limit=1000`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    geoData = await res.json();
+                    renderMap();
+                    renderSidebarFeed();
+                }
+            } catch (e) {
+                console.warn('Viewport data error:', e);
+            }
+        }
+
+        // ── RENDER MAP MARKERS ──
+        function renderMap() {
+            markersClusterGroup.clearLayers();
+            if (!geoData || !geoData.features) return;
+
+            geoData.features.forEach(feature => {
+                const props = feature.properties;
+                const sev = props.severity || 'Low';
+                
+                if (activeSeverity !== 'all' && sev.toLowerCase() !== activeSeverity.toLowerCase()) {
+                    return;
+                }
+
+                const [lon, lat] = feature.geometry.coordinates;
+                const color = getSeverityColor(sev);
+                const id = props.id;
+                const passes = props.observation_count || 1;
+                const status = props.status || 'active';
+                const thumbUrl = props.thumbnail_url || (isDeduplicated ? `/potholes/${id}/media` : `/detections/${id}/media`);
+
+                const icon = L.divIcon({
+                    className: 'custom-pothole-marker',
+                    html: `<div class="custom-pothole-pin" style="background-color:${color};"></div>`,
+                    iconSize: [24, 24]
+                });
+
+                const marker = L.marker([lat, lon], { icon });
+
+                marker.bindPopup(`
+                    <div style="width:230px; overflow:hidden; font-family:var(--font-sans);">
+                        <img src="${thumbUrl}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px; background:#1E293B;" onerror="this.style.display='none'" />
+                        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">${isDeduplicated ? 'Physical Pothole' : 'Single Detection'}</div>
+                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+                            Severity: <b style="color:${color};">${sev.toUpperCase()}</b> | Passes: <b>${passes}</b>
+                        </div>
+                        <button onclick="openInspector('${id}', ${isDeduplicated})" style="width:100%; padding:6px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer;">
+                            View Full Report
+                        </button>
+                    </div>
+                `);
+
+                markersClusterGroup.addLayer(marker);
+            });
+        }
+
+        // ── RENDER SIDEBAR FEED ──
+        function setSeverityFilter(sev, elem) {
+            activeSeverity = sev;
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            elem.classList.add('active');
+            renderMap();
+            renderSidebarFeed();
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.feed-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            renderSidebarFeed();
+        }
+
+        function renderSidebarFeed() {
+            const container = document.getElementById('feed-container');
+            if (!geoData || !geoData.features || geoData.features.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted); font-size:13px;">
+                        <i data-lucide="inbox" style="width:32px;height:32px;margin:0 auto 10px auto;display:block;opacity:0.5;"></i>
+                        No road defects found in current viewport
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            let items = geoData.features;
+            if (activeSeverity !== 'all') {
+                items = items.filter(f => (f.properties.severity || 'Low').toLowerCase() === activeSeverity.toLowerCase());
+            }
+            if (activeTab === 'urgent') {
+                items = items.filter(f => {
+                    const s = (f.properties.severity || '').toLowerCase();
+                    return s === 'critical' || s === 'high';
+                });
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted); font-size:13px;">
+                        No defects matching current filter
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = items.map(f => {
+                const p = f.properties;
+                const sev = p.severity || 'Low';
+                const color = getSeverityColor(sev);
+                const passes = p.observation_count || 1;
+                const [lon, lat] = f.geometry.coordinates;
+
+                return `
+                    <div class="pothole-card" onclick="flyToCity(${lat}, ${lon}, 16); openInspector('${p.id}', ${isDeduplicated})">
+                        <div class="card-header">
+                            <span class="card-title">
+                                <i data-lucide="map-pin" style="width:14px;height:14px;color:var(--primary)"></i>
+                                Pothole #${p.id.substring(0, 6)}
+                            </span>
+                            <span class="severity-badge" style="background:${color}22; color:${color};">
+                                ${sev}
+                            </span>
+                        </div>
+                        <div class="card-stats">
+                            <div class="stat-item">
+                                <span class="stat-lbl">Passes</span>
+                                <span class="stat-val">${passes}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-lbl">Confidence</span>
+                                <span class="stat-val">${(p.confidence * 100).toFixed(0)}%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-lbl">Status</span>
+                                <span class="stat-val" style="text-transform:capitalize;">${p.status || 'Active'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // ── INSPECTOR DRAWER ──
+        async function openInspector(id, isPothole = true) {
+            try {
+                const endpoint = isPothole ? `/potholes/${id}` : `/detections/${id}`;
+                const res = await fetch(endpoint);
+                if (!res.ok) return;
+                const d = await res.json();
+
+                document.getElementById('drawer-pothole-title').textContent = `Defect Profile #${id.substring(0, 8)}`;
+                document.getElementById('drawer-img').src = d.thumbnail_url;
+                document.getElementById('drawer-sev').textContent = d.severity || 'Low';
+                document.getElementById('drawer-sev').style.color = getSeverityColor(d.severity);
+                document.getElementById('drawer-status').textContent = (d.status || 'Active').toUpperCase();
+                document.getElementById('drawer-passes').textContent = `${d.observation_count || 1} Verified Pass${(d.observation_count || 1) > 1 ? 'es' : ''}`;
+                document.getElementById('drawer-conf').textContent = `${((d.avg_confidence || d.confidence || 0.9) * 100).toFixed(1)}%`;
+                document.getElementById('drawer-coords').textContent = `${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}`;
+
+                const timelineContainer = document.getElementById('drawer-timeline-list');
+                if (isPothole && d.observations && d.observations.length > 0) {
+                    timelineContainer.innerHTML = d.observations.map((obs, idx) => `
+                        <div class="timeline-item">
+                            <span><b>Pass #${idx + 1}</b> • Dev: ${obs.device_id.substring(0, 8)}</span>
+                            <span style="color:var(--text-muted);">${formatAgo(obs.captured_at)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    timelineContainer.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Single camera observation recorded.</div>`;
+                }
+
+                if (isPothole) {
+                    const isRepaired = d.status === 'repaired';
+                    document.getElementById('drawer-actions').innerHTML = `
+                        <button class="btn-primary" style="background:${isRepaired ? 'var(--primary)' : 'var(--sev-low)'};" onclick="updatePotholeStatus('${id}', '${isRepaired ? 'active' : 'repaired'}')">
+                            <i data-lucide="${isRepaired ? 'rotate-ccw' : 'check-circle'}" style="width:16px;height:16px;"></i>
+                            <span>${isRepaired ? 'Re-open Pothole' : 'Mark as Repaired'}</span>
+                        </button>
+                    `;
+                } else {
+                    document.getElementById('drawer-actions').innerHTML = '';
+                }
+
+                document.getElementById('inspector-overlay').classList.add('active');
+                lucide.createIcons();
+            } catch (e) {
+                console.warn('Inspector error:', e);
+            }
+        }
+
+        function closeInspector() {
+            document.getElementById('inspector-overlay').classList.remove('active');
+        }
+
+        async function updatePotholeStatus(potholeId, status) {
+            try {
+                await fetch(`/potholes/${potholeId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                closeInspector();
+                fetchTelemetry();
+            } catch (e) {
+                console.warn('Status update error:', e);
+            }
+        }
+
+        // ── SIMULATION TRIGGER ──
+        async function runSimulation() {
+            const btn = document.getElementById('btn-seed');
+            btn.innerHTML = '<i data-lucide="loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite;"></i><span>Simulating...</span>';
+            btn.style.pointerEvents = 'none';
+            lucide.createIcons();
+
+            await fetch('/seed', { method: 'POST' });
+            await fetchTelemetry();
+
+            btn.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i><span>Ingested!</span>';
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = '<i data-lucide="plus-circle" style="width:16px;height:16px;"></i><span>Simulate Ingestion</span>';
+                btn.style.pointerEvents = 'auto';
+                lucide.createIcons();
+            }, 1800);
+        }
+
+        // ── LIVE SSE RADAR ──
+        function startLiveStream() {
+            if (sseConnection) sseConnection.close();
+            sseConnection = new EventSource('/api/stream/events');
+
+            sseConnection.onopen = () => {
+                document.getElementById('live-status-text').textContent = 'Live Radar Active';
+            };
+
+            sseConnection.onmessage = (e) => {
+                if (e.data) {
+                    try {
+                        const event = JSON.parse(e.data);
+                        fetchTelemetry();
+                    } catch (err) {}
+                }
+            };
+
+            sseConnection.onerror = () => {
+                document.getElementById('live-status-text').textContent = 'Reconnecting...';
+            };
+        }
+
+        // ── BOOTSTRAP ──
+        lucide.createIcons();
+        fetchTelemetry();
+        startLiveStream();
+        setInterval(fetchTelemetry, 25000);
+    </script>
+</body>
+</html>
