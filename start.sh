@@ -30,14 +30,21 @@ EOF
 echo "📱 Mobile configuration updated -> http://$IP_ADDR:8000"
 
 # 3. Start Docker Containers if Docker is available
+# The worker is what turns uploads into detections: without it, events queue
+# in Redis forever and the map never updates.
 COMPOSE_ARGS=(-f infra/docker-compose.yml)
 # Compose resolves .env relative to the compose file, so point it at the repo root.
 [ -f "$DIR/.env" ] && COMPOSE_ARGS=(--env-file "$DIR/.env" "${COMPOSE_ARGS[@]}")
 if command -v docker >/dev/null 2>&1; then
-    echo "🐳 Checking background containers (Postgres, Redis, MinIO)..."
-    docker compose "${COMPOSE_ARGS[@]}" up db redis minio -d 2>/dev/null || \
-    sudo -n docker compose "${COMPOSE_ARGS[@]}" up db redis minio -d 2>/dev/null || \
-    echo "ℹ️  Docker unavailable — falling back to in-process Redis and local SQLite."
+    echo "🐳 Starting Postgres, Redis, MinIO + the detection worker..."
+    echo "   (first run builds the worker image — a few minutes)"
+    docker compose "${COMPOSE_ARGS[@]}" up -d db redis minio worker 2>/dev/null || \
+    sudo -n docker compose "${COMPOSE_ARGS[@]}" up -d db redis minio worker 2>/dev/null || \
+    echo "⚠️  Could not start containers. Without Docker there is no shared Redis —"
+    echo "   uploads from the phone will NOT be processed (fakeredis is per-process)."
+else
+    echo "⚠️  Docker not available: no worker, no shared queue."
+    echo "   The dashboard runs (seed data only); phone uploads won't be processed."
 fi
 
 # 4. Background Seeder to populate map if empty after server starts
@@ -52,6 +59,13 @@ echo "📡 Live Radar SSE : http://localhost:8000/api/stream/events"
 echo "📊 Metrics & Stats: http://localhost:8000/metrics"
 echo "============================================================"
 echo "✨ Server is LIVE and ready for iOS Expo Go & Web Browser!"
+echo "============================================================"
+echo "📱 On the phone (same Wi-Fi):"
+echo "   1. cd mobile && npm run start   # Expo dev server (laptop, port 8081)"
+echo "   2. Scan the QR code with Expo Go"
+echo "   3. Phone needs BOTH ports reachable: 8081 (app bundle) and 8000 (API)"
+echo "   4. If the phone can't connect, open the firewall:"
+echo "      sudo firewall-cmd --add-port=8000/tcp --add-port=8081/tcp"
 echo "============================================================"
 
 exec "$DIR/.venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 # variables outrank the .env file in pydantic-settings, so this wins.
 os.environ["ENVIRONMENT"] = "test"
 os.environ["ROBOFLOW_API_KEY"] = "test-roboflow-key"
-os.environ["ROBOFLOW_MODEL_ID"] = "test-model/1"
+os.environ["ROBOFLOW_MODEL_IDS"] = "test-model/1"
 
 # Mock cv2 and inference_sdk if they are not installed
 try:

@@ -54,6 +54,22 @@ Then:
 - Live event stream (SSE) — <http://localhost:8000/api/stream/events>
 - Metrics — <http://localhost:8000/metrics>
 
+### Testing with the phone (dashboard on laptop, app on phone)
+
+1. Same Wi-Fi on both devices. Start the stack: `./start.sh` — it starts
+   Postgres/Redis/MinIO **and the worker** in Docker, writes `mobile/.env` with
+   your LAN IP, and serves the dashboard on `0.0.0.0:8000`.
+2. In another terminal: `cd mobile && npm run start`, scan the QR code with
+   Expo Go.
+3. The phone needs **two** ports reachable on the laptop: `8081` (Expo dev
+   bundle) and `8000` (API). On EndeavourOS:
+   `sudo firewall-cmd --add-port=8000/tcp --add-port=8081/tcp`
+4. Smart Patrol (bump snapshots) and Video Patrol (chunked clips) land in
+   MinIO → Redis → worker → Roboflow → map. Expect ~10–30 s end-to-end.
+
+Docker must be running for this to work: `start.sh` warns loudly if it isn't,
+ because without a shared Redis the worker cannot see the uploads.
+
 ### Graceful degradation
 
 `ENVIRONMENT=development` (the default) keeps two local fallbacks alive so the
@@ -79,7 +95,7 @@ the inference API and then stored as a successful "no potholes here" reading.
 
 ---
 
-## Video handling
+## Video handling and multi-model inference
 
 A clip is subsampled rather than decoded whole, because inference is billed per
 frame:
@@ -87,8 +103,16 @@ frame:
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `VIDEO_SAMPLE_EVERY_N_FRAMES` | `15` | ~2 frames/sec on 30 fps footage |
-| `VIDEO_MAX_FRAMES` | `20` | Hard ceiling on API calls per clip |
+| `VIDEO_MAX_FRAMES` | `20` | Hard ceiling on sampled frames per clip |
 
+`ROBOFLOW_MODEL_IDS` takes a comma-separated list of Roboflow `project/version`
+ids. Every model runs on every sampled frame and the detections are merged,
+each keeping its model's own class name — so one deployment can detect potholes,
+cracks, and other road damage at once. The cost formula is:
+
+> calls per clip = sampled frames × number of models (default 20 × 2 = 40)
+
+Trim the bill by lowering `VIDEO_MAX_FRAMES` or running fewer models.
 Detections carry `frame_index` and `timestamp_ms` so a hit can be traced back to
 its moment in the clip.
 
@@ -104,7 +128,7 @@ The ones with no safe default:
 | --- | --- |
 | `API_KEYS` | JSON map `api_key -> device_id`. Empty means every ingest returns 401 |
 | `ROBOFLOW_API_KEY` | External inference credential |
-| `ROBOFLOW_MODEL_ID` | The built-in default `coco/3` has **no pothole class** |
+| `ROBOFLOW_MODEL_IDS` | Comma-separated model list. The default `coco/3` has **no road-damage classes**. Verified public options: `pothole-detection-03iso/1` (Potholes), `damage-road/1` (pothole + crack, mAP@50 71.9) |
 | `DATABASE_URL` | Postgres DSN |
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Object storage credentials |
 
@@ -153,5 +177,8 @@ published; `/metrics` is restricted to private ranges.
 - The compose stack uses the `postgis/postgis` image but no PostGIS types are
   used — clustering is Haversine in Python. Plain `postgres` would do.
 - Video frames are sampled at a fixed stride. There is no motion or
-  bump-signal gating, so a clip of smooth road still costs `VIDEO_MAX_FRAMES`
-  inference calls.
+  bump-signal gating, so a clip of smooth road still costs
+  `VIDEO_MAX_FRAMES × len(ROBOFLOW_MODEL_IDS)` inference calls.
+- Clustering is purely spatial (label-agnostic): a crack and a pothole at the
+  same spot merge into one canonical marker; both labels survive in its
+  observation history.

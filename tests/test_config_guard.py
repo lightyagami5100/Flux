@@ -12,7 +12,7 @@ def _settings(**overrides: object) -> Settings:
         "minio_access_key": "real-access",
         "minio_secret_key": "real-secret",
         "roboflow_api_key": "rf-key",
-        "roboflow_model_id": "potholes/7",
+        "roboflow_model_ids": ["potholes/7"],
     }
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[arg-type]
@@ -25,8 +25,9 @@ def test_development_defaults_are_allowed_outside_production() -> None:
 
 
 def test_production_rejects_the_placeholder_coco_model() -> None:
-    """coco/3 has no pothole class; shipping it would detect nothing useful."""
-    assert "ROBOFLOW_MODEL_ID" in _settings(roboflow_model_id="coco/3").missing_production_settings()
+    """coco/3 has no road-damage classes; shipping it would detect nothing useful."""
+    assert "ROBOFLOW_MODEL_IDS" in _settings(roboflow_model_ids=["coco/3"]).missing_production_settings()
+    assert "ROBOFLOW_MODEL_IDS" in _settings(roboflow_model_ids=[]).missing_production_settings()
 
 
 def test_fully_configured_production_reports_no_problems() -> None:

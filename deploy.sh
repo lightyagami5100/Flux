@@ -33,7 +33,7 @@ set -a
 source "${REPO_ROOT}/.env"
 set +a
 
-REQUIRED=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB MINIO_ACCESS_KEY MINIO_SECRET_KEY API_KEYS ROBOFLOW_API_KEY ROBOFLOW_MODEL_ID)
+REQUIRED=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB MINIO_ACCESS_KEY MINIO_SECRET_KEY API_KEYS ROBOFLOW_API_KEY ROBOFLOW_MODEL_IDS)
 MISSING=()
 for var in "${REQUIRED[@]}"; do
   [[ -n "${!var:-}" ]] || MISSING+=("${var}")
@@ -46,8 +46,8 @@ if [[ "${MINIO_ACCESS_KEY}" == "minioadmin" || "${MINIO_SECRET_KEY}" == "minioad
   fail "MINIO_ACCESS_KEY/MINIO_SECRET_KEY are still the default 'minioadmin'."
 fi
 
-if [[ "${ROBOFLOW_MODEL_ID}" == "coco/3" ]]; then
-  fail "ROBOFLOW_MODEL_ID is still coco/3, which has no pothole class. Point it at a real model."
+if [[ "${ROBOFLOW_MODEL_IDS}" == *"coco/3"* ]]; then
+  fail "ROBOFLOW_MODEL_IDS contains coco/3, which has no road-damage classes. Point it at real models."
 fi
 
 # Validate the rendered compose file before touching running containers.

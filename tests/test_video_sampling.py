@@ -79,7 +79,7 @@ class TestVideoSampling:
     def test_infer_calls_the_api_once_per_sampled_frame(self, processor, tmp_path):
         media = _encode_clip(tmp_path, frame_count=30)
         processor.settings = processor.settings.model_copy(
-            update={"video_sample_every_n_frames": 10, "video_max_frames": 20}
+            update={"roboflow_model_ids": ["potholes/7"], "video_sample_every_n_frames": 10, "video_max_frames": 20}
         )
 
         result = processor.infer(media, MediaType.VIDEO, "clip.mp4")
@@ -88,10 +88,38 @@ class TestVideoSampling:
         assert result.metadata["frames_inferred"] == 3
         assert result.media_type == MediaType.VIDEO
 
+    def test_multiple_models_each_run_on_every_frame_and_merge(self, processor, tmp_path):
+        """N models = N billed calls per frame, detections merged and labeled per model."""
+        media = _encode_clip(tmp_path, frame_count=20, fps=10)
+        processor.settings = processor.settings.model_copy(
+            update={
+                "roboflow_model_ids": ["potholes/7", "damage-road/1"],
+                "video_sample_every_n_frames": 10,
+                "video_max_frames": 20,
+            }
+        )
+
+        def fake_infer(image, model_id=None):
+            cls = "pothole" if model_id == "potholes/7" else "crack"
+            return {"predictions": [{"class": cls, "confidence": 0.7, "x": 32, "y": 32, "width": 8, "height": 8}]}
+
+        processor.client.infer.side_effect = fake_infer
+
+        result = processor.infer(media, MediaType.VIDEO, "clip.mp4")
+
+        # 2 frames x 2 models
+        assert processor.client.infer.call_count == 4
+        assert sorted(call.kwargs["model_id"] for call in processor.client.infer.call_args_list) == [
+            "damage-road/1", "damage-road/1", "potholes/7", "potholes/7",
+        ]
+        assert sorted(d.class_name for d in result.detections) == ["crack", "crack", "pothole", "pothole"]
+        assert result.model_name == "potholes/7,damage-road/1"
+        assert result.metadata["detections_per_model"] == {"potholes/7": 2, "damage-road/1": 2}
+
     def test_detections_carry_frame_provenance(self, processor, tmp_path):
         media = _encode_clip(tmp_path, frame_count=20, fps=10)
         processor.settings = processor.settings.model_copy(
-            update={"video_sample_every_n_frames": 10, "video_max_frames": 20}
+            update={"roboflow_model_ids": ["potholes/7"], "video_sample_every_n_frames": 10, "video_max_frames": 20}
         )
         processor.client.infer.return_value = {
             "predictions": [
@@ -107,7 +135,7 @@ class TestVideoSampling:
     def test_uses_the_configured_model_id(self, processor, tmp_path):
         media = _encode_clip(tmp_path, frame_count=1)
         processor.settings = processor.settings.model_copy(
-            update={"roboflow_model_id": "potholes/7", "video_max_frames": 1}
+            update={"roboflow_model_ids": ["potholes/7"], "video_max_frames": 1}
         )
 
         result = processor.infer(media, MediaType.VIDEO, "clip.mp4")

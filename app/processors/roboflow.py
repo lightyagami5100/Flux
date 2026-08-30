@@ -110,19 +110,22 @@ class RoboflowProcessor(BaseProcessor):
         else:
             frames = [(0, 0, self._decode_image(media_bytes, file_id))]
 
+        model_ids = self.settings.roboflow_model_ids or ["coco/3"]
         detections: list[Detection] = []
+        per_model_counts: dict[str, int] = {}
         for frame_index, timestamp_ms, image in frames:
-            detections.extend(
-                self._infer_frame(image, file_id, frame_index, timestamp_ms)
-            )
+            for model_id in model_ids:
+                found = self._infer_frame(image, file_id, frame_index, timestamp_ms, model_id)
+                per_model_counts[model_id] = per_model_counts.get(model_id, 0) + len(found)
+                detections.extend(found)
 
         return ProcessingResult(
             processor_name=self.name,
             processor_version=self.version,
-            model_name=self.settings.roboflow_model_id,
+            model_name=",".join(model_ids),
             media_type=media_type,
             detections=tuple(detections),
-            metadata={"frames_inferred": len(frames)},
+            metadata={"frames_inferred": len(frames), "detections_per_model": per_model_counts},
         )
 
     # ------------------------------------------------------------- decoding
@@ -185,9 +188,9 @@ class RoboflowProcessor(BaseProcessor):
 
     # ------------------------------------------------------------ inference
     def _infer_frame(
-        self, image: Any, file_id: str, frame_index: int, timestamp_ms: int
+        self, image: Any, file_id: str, frame_index: int, timestamp_ms: int, model_id: str
     ) -> list[Detection]:
-        """One external API call, guarded by the circuit breaker."""
+        """One external API call against one model, guarded by the circuit breaker."""
         if self._cb_failures >= 3:
             if time.time() < self._cb_reset_time:
                 raise CircuitBreakerOpen("Circuit breaker is OPEN. Roboflow API is temporarily unavailable.")
@@ -199,7 +202,7 @@ class RoboflowProcessor(BaseProcessor):
             reraise=True,
         )
         def _do_infer() -> dict[str, Any]:
-            return self.client.infer(image, model_id=self.settings.roboflow_model_id)
+            return self.client.infer(image, model_id=model_id)
 
         detections: list[Detection] = []
         try:
@@ -222,7 +225,7 @@ class RoboflowProcessor(BaseProcessor):
                     timestamp_ms=timestamp_ms,
                 ))
         except Exception as e:
-            logger.error("Roboflow inference failed for %s frame %d: %s", file_id, frame_index, e)
+            logger.error("Roboflow inference failed for %s frame %d (model %s): %s", file_id, frame_index, model_id, e)
             self._cb_failures += 1
             if self._cb_failures >= 3:
                 self._cb_reset_time = time.time() + 60

@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -55,10 +56,12 @@ class Settings(BaseSettings):
     # --- Processor (Sprint 2 & 4) ---
     processor_name: str = "roboflow"
     roboflow_api_key: str = ""
-    # Roboflow project/version to call, e.g. "pothole-detection-project/4".
+    # Roboflow project/version ids to call, e.g. "pothole-detection-03iso/1,damage-road/1".
+    # Comma-separated in the env (ROBOFLOW_MODEL_IDS); every model runs on every
+    # sampled frame and detections are merged, so N models = N API calls per frame.
     # The default is the generic COCO model, which has NO pothole class - it is
-    # only useful for wiring smoke tests. Set this to a real pothole model.
-    roboflow_model_id: str = "coco/3"
+    # only useful for wiring smoke tests. Set real road-damage models.
+    roboflow_model_ids: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["coco/3"])
 
     # --- Video sampling ---
     # Inference is billed per frame, so video is sampled rather than decoded whole.
@@ -66,6 +69,18 @@ class Settings(BaseSettings):
     video_max_frames: int = 20              # hard ceiling on API calls per clip
 
     log_level: str = "INFO"
+
+    @field_validator("roboflow_model_ids", mode="before")
+    @classmethod
+    def _split_model_ids(cls, v: object) -> object:
+        """Accept a comma-separated env string ("a/1,b/2") or a real list.
+
+        NoDecode stops pydantic-settings from trying to JSON-parse the env
+        value first, which would reject a plain comma-separated string.
+        """
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     @field_validator("api_keys", mode="before")
     @classmethod
@@ -103,8 +118,10 @@ class Settings(BaseSettings):
             problems.append("MINIO_SECRET_KEY")
         if self.processor_name == "roboflow" and not self.roboflow_api_key:
             problems.append("ROBOFLOW_API_KEY")
-        if self.processor_name == "roboflow" and self.roboflow_model_id == "coco/3":
-            problems.append("ROBOFLOW_MODEL_ID")
+        if self.processor_name == "roboflow" and (
+            not self.roboflow_model_ids or "coco/3" in self.roboflow_model_ids
+        ):
+            problems.append("ROBOFLOW_MODEL_IDS")
         return problems
 
 

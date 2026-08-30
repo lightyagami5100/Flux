@@ -17,8 +17,8 @@ x-app: &app
     MINIO_BUCKET: ${MINIO_BUCKET:-media}
     PROCESSOR_NAME: ${PROCESSOR_NAME:-roboflow}
     ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:?ROBOFLOW_API_KEY is required}
-    # coco/3 has no pothole class, so it is rejected by the startup guard.
-    ROBOFLOW_MODEL_ID: ${ROBOFLOW_MODEL_ID:?ROBOFLOW_MODEL_ID is required (e.g. my-pothole-project/4)}
+    # coco/3 has no road-damage classes, so it is rejected by the startup guard.
+    ROBOFLOW_MODEL_IDS: ${ROBOFLOW_MODEL_IDS:?ROBOFLOW_MODEL_IDS is required (comma-separated, e.g. pothole-detection-03iso/1,damage-road/1)}
     VIDEO_SAMPLE_EVERY_N_FRAMES: ${VIDEO_SAMPLE_EVERY_N_FRAMES:-15}
     VIDEO_MAX_FRAMES: ${VIDEO_MAX_FRAMES:-20}
     API_KEYS: ${API_KEYS:?API_KEYS is required (JSON map of api_key -> device_id)}
