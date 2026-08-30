@@ -74,6 +74,8 @@ def mock_app_state():
     mock_settings.minio_secure = False
     mock_settings.ingest_stream = "stream:detections"
     mock_settings.stream_maxlen = 10000
+    mock_settings.is_production = False
+    mock_settings.missing_production_settings.return_value = []
 
     with patch("app.upload_manager.Minio", return_value=fake_minio):
         manager = UploadManager(

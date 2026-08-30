@@ -1,7 +1,7 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy import Column, Integer, String, Float, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://flux_user:flux_password@localhost:5432/flux_db")
 

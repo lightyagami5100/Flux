@@ -12,14 +12,11 @@ Flow:
 from __future__ import annotations
 
 import io
-import json
 import logging
 import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
 
 try:
     from minio import Minio
@@ -107,12 +104,24 @@ class UploadManager:
         longitude: float,
         content_type: str = "video/mp4",
     ) -> UploadSession:
-        """Create a new upload session and return its metadata."""
+        """Create a new upload session with sanitized inputs and return its metadata."""
+        import os
+        import re
+
+        # Security hardening: sanitize filename to prevent path traversal
+        clean_filename = re.sub(r"[^a-zA-Z0-9_.-]", "_", os.path.basename(filename)) or "uploaded_media.mp4"
+
+        # Boundary checks
+        if not (-90.0 <= latitude <= 90.0) or not (-180.0 <= longitude <= 180.0):
+            raise ValueError(f"Invalid GPS coordinates: lat={latitude}, lon={longitude}")
+        if total_chunks <= 0 or total_chunks > 10000:
+            raise ValueError(f"Invalid total_chunks: {total_chunks} (must be between 1 and 10000)")
+
         session_id = uuid.uuid4().hex
         session = UploadSession(
             session_id=session_id,
             device_id=device_id,
-            filename=filename,
+            filename=clean_filename,
             total_chunks=total_chunks,
             latitude=latitude,
             longitude=longitude,
@@ -125,7 +134,7 @@ class UploadManager:
         )
         return session
 
-    def get_session(self, session_id: str) -> Optional[UploadSession]:
+    def get_session(self, session_id: str) -> UploadSession | None:
         """Look up a session by ID."""
         return self._sessions.get(session_id)
 

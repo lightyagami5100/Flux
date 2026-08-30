@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Type
+from typing import Any
 
 from .base import (
     BaseProcessor,
@@ -25,16 +25,16 @@ __all__ = [
     "available_processors",
 ]
 
-_REGISTRY: dict[str, Type[BaseProcessor]] = {}
+_REGISTRY: dict[str, type[BaseProcessor]] = {}
 
-# Built-ins are imported lazily so heavy ML dependencies (torch, ultralytics)
-# are only loaded in processes that actually use them.
+# Built-ins are imported lazily so an optional dependency (inference-sdk) is only
+# required in processes that actually run inference.
 _BUILTINS: dict[str, str] = {
     "roboflow": "app.processors.roboflow",
 }
 
 
-def register_processor(cls: Type[BaseProcessor]) -> Type[BaseProcessor]:
+def register_processor(cls: type[BaseProcessor]) -> type[BaseProcessor]:
     """Class decorator: add a BaseProcessor subclass to the registry."""
     if not (isinstance(cls, type) and issubclass(cls, BaseProcessor)):
         raise TypeError("@register_processor expects a BaseProcessor subclass")
@@ -61,3 +61,11 @@ def create_processor(name: str, **kwargs: Any) -> BaseProcessor:
     if cls is None:
         raise KeyError(f"Unknown processor {name!r}. Available: {available_processors()}")
     return cls(**kwargs)
+
+
+def __getattr__(name: str) -> Any:
+    """Allow lazy resolution of built-in processor modules (e.g. app.processors.roboflow)."""
+    if name in _BUILTINS:
+        return importlib.import_module(_BUILTINS[name])
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

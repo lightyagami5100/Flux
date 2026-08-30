@@ -9,8 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, UTC
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,9 +32,9 @@ SEVERITY_RANKS = {
 
 def _normalize_dt(dt: datetime | None) -> datetime:
     if dt is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -130,7 +129,7 @@ async def cluster_detection(
     result = await session.execute(stmt)
     candidates = result.scalars().all()
 
-    best_match: Optional[CanonicalPothole] = None
+    best_match: CanonicalPothole | None = None
     best_dist = float("inf")
 
     for cand in candidates:
@@ -146,6 +145,12 @@ async def cluster_detection(
     event_dt = _normalize_dt(event.captured_at)
 
     # Observation record to append
+    event_label = "pothole"
+    if event.objects:
+        event_label = event.objects[0].get("label", "pothole") if isinstance(event.objects[0], dict) else "pothole"
+    elif hasattr(event, 'metrics') and isinstance(event.metrics, dict):
+        event_label = event.metrics.get("label", "pothole")
+
     obs_record = {
         "event_id": str(event.event_id),
         "device_id": event.device_id,
@@ -156,6 +161,7 @@ async def cluster_detection(
         "confidence": event_conf,
         "media_uri": event.media_uri,
         "object_count": event.object_count,
+        "label": event_label,
     }
 
     if best_match is not None:

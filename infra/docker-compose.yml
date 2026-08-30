@@ -1,18 +1,18 @@
-version: '3.8'
-
+# Local development stack.
+# Credentials come from ../.env (see .env.example). Defaults are dev-only.
 services:
   db:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: flux_user
-      POSTGRES_PASSWORD: flux_password
-      POSTGRES_DB: flux_db
+      POSTGRES_USER: ${POSTGRES_USER:-flux}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flux}
+      POSTGRES_DB: ${POSTGRES_DB:-flux}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flux_user -d flux_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flux} -d ${POSTGRES_DB:-flux}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,8 +33,8 @@ services:
   minio:
     image: minio/minio:latest
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -47,22 +47,28 @@ services:
       timeout: 3s
       retries: 5
 
-  api:
+  api: &app
     build:
       context: ..
       dockerfile: Dockerfile
+    environment:
+      ENVIRONMENT: development
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-flux}:${POSTGRES_PASSWORD:-flux}@db:5432/${POSTGRES_DB:-flux}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: ${MINIO_BUCKET:-media}
+      PROCESSOR_NAME: ${PROCESSOR_NAME:-roboflow}
+      ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:-}
+      ROBOFLOW_MODEL_ID: ${ROBOFLOW_MODEL_ID:-coco/3}
+      VIDEO_SAMPLE_EVERY_N_FRAMES: ${VIDEO_SAMPLE_EVERY_N_FRAMES:-15}
+      VIDEO_MAX_FRAMES: ${VIDEO_MAX_FRAMES:-20}
+      API_KEYS: ${API_KEYS:-}
+      AUTO_CREATE_TABLES: "true"
     ports:
       - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql+asyncpg://flux_user:flux_password@db:5432/flux_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_SECURE=False
-      - ROBOFLOW_API_KEY=${ROBOFLOW_API_KEY}
-      - PROCESSOR_NAME=roboflow
-      - AUTO_CREATE_TABLES=True
     depends_on:
       db:
         condition: service_healthy
@@ -72,26 +78,9 @@ services:
         condition: service_healthy
 
   worker:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    <<: *app
     command: ["python", "-m", "app.worker"]
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql+asyncpg://flux_user:flux_password@db:5432/flux_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_SECURE=False
-      - ROBOFLOW_API_KEY=${ROBOFLOW_API_KEY}
-      - PROCESSOR_NAME=roboflow
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+    ports: []
 
 volumes:
   pgdata:

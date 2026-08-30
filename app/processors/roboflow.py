@@ -1,121 +1,232 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 import time
 from typing import Any
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-class CircuitBreakerOpen(Exception):
-    pass
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential
+except ImportError:  # pragma: no cover - tenacity is a declared dependency
+    def retry(stop=None, wait=None, reraise=True):
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                attempts = 3
+                for attempt in range(attempts):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception:
+                        if attempt == attempts - 1:
+                            if reraise:
+                                raise
+                            return None
+                        time.sleep(0.05 * (2 ** attempt))
+            return wrapper
+        return decorator
 
-from inference_sdk import InferenceHTTPClient
+    def stop_after_attempt(n):
+        return n
+
+    def wait_exponential(**kwargs):
+        return kwargs
+
+try:
+    from inference_sdk import InferenceHTTPClient
+except ImportError:
+    InferenceHTTPClient = None  # type: ignore[assignment]
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover - numpy is a declared dependency
+    np = None  # type: ignore[assignment]
 
 from app.config import get_settings
+from app.processors import register_processor
+
 from .base import (
     BaseProcessor,
     Detection,
     MediaType,
+    PermanentProcessingError,
     ProcessingResult,
 )
-from app.processors import register_processor
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitBreakerOpen(Exception):
+    """Raised while the breaker is open and calls are being short-circuited."""
+
+
+class ProcessorUnavailable(Exception):
+    """Raised when the external inference backend cannot be constructed at all."""
+
+
+class MediaUndecodable(PermanentProcessingError):
+    """Raised when the supplied bytes are not a decodable image or video."""
+
 
 @register_processor
 class RoboflowProcessor(BaseProcessor):
     name = "roboflow"
-    
+    version = "1.0.0"
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.settings = get_settings()
-        self.client = None
-        self.model_id = "yolov8n-640" # Fallback/default if we don't have a specific custom model
+        self.client: Any = None
+        # Fallback/default if we don't have a specific custom model.
+        self.model_id = "yolov8n-640"
+        self._cb_failures: int = 0
+        self._cb_reset_time: float = 0.0
 
     def load(self) -> None:
         """Initialize the InferenceHTTPClient."""
         logger.info("Initializing Roboflow inference client...")
+        if InferenceHTTPClient is None:
+            raise ProcessorUnavailable(
+                "inference-sdk is not installed; the Roboflow processor cannot run. "
+                "Install it (see requirements.txt) or set PROCESSOR_NAME to another backend."
+            )
+
         api_key = self.settings.roboflow_api_key
         if not api_key:
-            logger.warning("ROBOFLOW_API_KEY is not set. Inference will fail.")
-        
+            raise ProcessorUnavailable(
+                "ROBOFLOW_API_KEY is not set; refusing to start the Roboflow processor."
+            )
+
         self.client = InferenceHTTPClient(
             api_url="https://detect.roboflow.com",
-            api_key=api_key
+            api_key=api_key,
         )
 
     def infer(self, media_bytes: bytes, media_type: MediaType, file_id: str) -> ProcessingResult:
-        """Run inference using Roboflow Inference API."""
+        """Run inference using the Roboflow Inference HTTP API."""
         if self.client is None:
             self.load()
-            
-        import numpy as np
-        import cv2
 
         if media_type == MediaType.VIDEO:
-            # We would sample frames here, but for simplicity we will just log a warning
-            # and try to infer on a blank frame or first frame
-            logger.warning("Video inference on Roboflow not fully implemented; falling back to blank image")
-            image = np.zeros((640, 640, 3), dtype=np.uint8)
+            frames = self._sample_video_frames(media_bytes, file_id)
         else:
-            # Decode the image bytes
-            np_arr = np.frombuffer(media_bytes, np.uint8)
-            image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            if image is None:
-                raise ValueError(f"Could not decode image bytes for {file_id}")
-        # Circuit breaker logic
-        if hasattr(self, "_cb_failures") and self._cb_failures >= 3:
+            frames = [(0, 0, self._decode_image(media_bytes, file_id))]
+
+        detections: list[Detection] = []
+        for frame_index, timestamp_ms, image in frames:
+            detections.extend(
+                self._infer_frame(image, file_id, frame_index, timestamp_ms)
+            )
+
+        return ProcessingResult(
+            processor_name=self.name,
+            processor_version=self.version,
+            model_name=self.settings.roboflow_model_id,
+            media_type=media_type,
+            detections=tuple(detections),
+            metadata={"frames_inferred": len(frames)},
+        )
+
+    # ------------------------------------------------------------- decoding
+    def _decode_image(self, media_bytes: bytes, file_id: str) -> Any:
+        """Decode raw image bytes into a BGR array."""
+        import cv2
+
+        if np is None:
+            raise ProcessorUnavailable("numpy is required to decode media bytes.")
+
+        image = cv2.imdecode(np.frombuffer(media_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            raise MediaUndecodable(f"Could not decode image bytes for {file_id}")
+        return image
+
+    def _sample_video_frames(
+        self, media_bytes: bytes, file_id: str
+    ) -> list[tuple[int, int, Any]]:
+        """Decode a clip and return every Nth frame as (index, timestamp_ms, image).
+
+        Inference is billed per call, so the clip is subsampled and capped. cv2 has
+        no bytes-based reader, hence the temp file.
+        """
+        import cv2
+
+        step = max(1, self.settings.video_sample_every_n_frames)
+        limit = max(1, self.settings.video_max_frames)
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4") as handle:
+            handle.write(media_bytes)
+            handle.flush()
+
+            capture = cv2.VideoCapture(handle.name)
+            if not capture.isOpened():
+                capture.release()
+                raise MediaUndecodable(f"Could not open video bytes for {file_id}")
+
+            fps = capture.get(cv2.CAP_PROP_FPS) or 0.0
+            frames: list[tuple[int, int, Any]] = []
+            frame_index = 0
+            try:
+                while len(frames) < limit:
+                    ok, frame = capture.read()
+                    if not ok:
+                        break
+                    if frame_index % step == 0:
+                        timestamp_ms = int(frame_index / fps * 1000) if fps > 0 else 0
+                        frames.append((frame_index, timestamp_ms, frame))
+                    frame_index += 1
+            finally:
+                capture.release()
+
+        if not frames:
+            raise MediaUndecodable(f"Video {file_id} yielded no decodable frames")
+
+        logger.info(
+            "sampled %d frame(s) from %s (every %d, cap %d)", len(frames), file_id, step, limit
+        )
+        return frames
+
+    # ------------------------------------------------------------ inference
+    def _infer_frame(
+        self, image: Any, file_id: str, frame_index: int, timestamp_ms: int
+    ) -> list[Detection]:
+        """One external API call, guarded by the circuit breaker."""
+        if self._cb_failures >= 3:
             if time.time() < self._cb_reset_time:
                 raise CircuitBreakerOpen("Circuit breaker is OPEN. Roboflow API is temporarily unavailable.")
-            else:
-                self._cb_failures = 0 # Half-open
+            self._cb_failures = 0  # half-open: allow one probe through
 
         @retry(
             stop=stop_after_attempt(3),
             wait=wait_exponential(multiplier=1, min=2, max=10),
-            reraise=True
+            reraise=True,
         )
-        def _do_infer():
-            return self.client.infer(image, model_id="coco/3")
+        def _do_infer() -> dict[str, Any]:
+            return self.client.infer(image, model_id=self.settings.roboflow_model_id)
 
-        detections = []
+        detections: list[Detection] = []
         try:
             result = _do_infer()
-            self._cb_failures = 0 # Success resets circuit breaker
-            
+            self._cb_failures = 0  # success resets the breaker
+
             for pred in result.get("predictions", []):
-                # Roboflow returns x, y (center), width, height
+                # Roboflow returns center-x, center-y, width, height.
                 x = pred["x"]
                 y = pred["y"]
                 w = pred["width"]
                 h = pred["height"]
-                
-                # Convert to x1, y1, x2, y2
-                x1 = x - (w / 2)
-                y1 = y - (h / 2)
-                x2 = x + (w / 2)
-                y2 = y + (h / 2)
-                
+
                 detections.append(Detection(
                     class_id=pred.get("class_id", 0),
                     class_name=pred["class"],
                     confidence=pred["confidence"],
-                    bbox=(x1, y1, x2, y2)
+                    bbox=(x - (w / 2), y - (h / 2), x + (w / 2), y + (h / 2)),
+                    frame_index=frame_index,
+                    timestamp_ms=timestamp_ms,
                 ))
         except Exception as e:
-            logger.error(f"Roboflow inference failed: {e}")
-            if not hasattr(self, "_cb_failures"):
-                self._cb_failures = 0
+            logger.error("Roboflow inference failed for %s frame %d: %s", file_id, frame_index, e)
             self._cb_failures += 1
             if self._cb_failures >= 3:
-                self._cb_reset_time = time.time() + 60 # Cooldown for 60 seconds
+                self._cb_reset_time = time.time() + 60
                 logger.error("Circuit breaker OPENED for 60 seconds.")
             raise
-            
-        return ProcessingResult(
-            processor_name=self.name,
-            processor_version="1.0.0",
-            model_name="coco/3",
-            media_type=media_type,
-            detections=tuple(detections),
-            metadata={"source": "roboflow"}
-        )
+
+        return detections

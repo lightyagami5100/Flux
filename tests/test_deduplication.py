@@ -1,7 +1,7 @@
 """Unit & Integration Tests for MS-008: Spatial Deduplication & Canonical Pothole Clustering."""
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -78,8 +78,8 @@ class TestSpatialClusteringEngine:
         ev = DetectionEvent(
             event_id=uuid.uuid4(),
             device_id="mobile_1",
-            captured_at=datetime.now(timezone.utc),
-            received_at=datetime.now(timezone.utc),
+            captured_at=datetime.now(UTC),
+            received_at=datetime.now(UTC),
             status=DetectionStatus.PROCESSED,
             media_kind="image",
             media_uri="minio://test/img1.jpg",
@@ -118,8 +118,8 @@ class TestSpatialClusteringEngine:
             status=PotholeStatus.ACTIVE,
             observation_count=1,
             avg_confidence=0.80,
-            first_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=timezone.utc),
-            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=timezone.utc),
+            first_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
+            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
             primary_media_uri="minio://test/img1.jpg",
             observations=[{"event_id": "old_1", "confidence": 0.80}],
         )
@@ -128,8 +128,8 @@ class TestSpatialClusteringEngine:
         new_ev = DetectionEvent(
             event_id=uuid.uuid4(),
             device_id="mobile_2",
-            captured_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=timezone.utc),
-            received_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=timezone.utc),
+            captured_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=UTC),
+            received_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=UTC),
             status=DetectionStatus.PROCESSED,
             media_kind="image",
             media_uri="minio://test/img2.jpg",
@@ -170,8 +170,8 @@ class TestPotholeEndpointsAPI:
             status=PotholeStatus.ACTIVE,
             observation_count=4,
             avg_confidence=0.92,
-            first_detected_at=datetime(2026, 8, 25, 8, 0, 0, tzinfo=timezone.utc),
-            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=timezone.utc),
+            first_detected_at=datetime(2026, 8, 25, 8, 0, 0, tzinfo=UTC),
+            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
             primary_event_id=uuid.uuid4(),
             primary_media_uri="minio://test/pothole.jpg",
             observations=[],
@@ -211,8 +211,8 @@ class TestPotholeEndpointsAPI:
             status=PotholeStatus.ACTIVE,
             observation_count=2,
             avg_confidence=0.89,
-            first_detected_at=datetime(2026, 8, 25, 9, 0, 0, tzinfo=timezone.utc),
-            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=timezone.utc),
+            first_detected_at=datetime(2026, 8, 25, 9, 0, 0, tzinfo=UTC),
+            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
             primary_event_id=uuid.uuid4(),
             primary_media_uri="minio://test/best.jpg",
             observations=[
@@ -250,8 +250,8 @@ class TestPotholeEndpointsAPI:
             status=PotholeStatus.ACTIVE,
             observation_count=1,
             avg_confidence=0.90,
-            first_detected_at=datetime.now(timezone.utc),
-            last_detected_at=datetime.now(timezone.utc),
+            first_detected_at=datetime.now(UTC),
+            last_detected_at=datetime.now(UTC),
             primary_media_uri="minio://test/p.jpg",
             observations=[],
         )

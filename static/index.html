@@ -1,98 +1,155 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flux — Road Intelligence & Infrastructure Dashboard</title>
-    <!-- Leaflet & MarkerCluster CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flux — Enterprise Road & Municipal Infrastructure Surveillance</title>
+    
+    <!-- Leaflet & Spatial Plugins -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-    <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+    
+    <!-- Apple / Google Pro Typography: Inter, Plus Jakarta Sans, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
     <style>
         /* ═══════════════════════════════════════════════════════════════
-           MODERN SAAS DESIGN TOKENS (No AI Slop / Professional Clean)
+           APPLE macOS SEQUOIA & VISION-OS ULTRA LIQUID GLASS TOKENS
            ═══════════════════════════════════════════════════════════════ */
         :root {
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Roboto', sans-serif;
             --font-heading: 'Plus Jakarta Sans', var(--font-sans);
-            --sidebar-width: 400px;
-            --topbar-height: 60px;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --sidebar-width: 450px;
+            --topbar-height: 64px;
+            
+            /* Apple Liquid Glass Radii */
+            --radius-3xl: 28px;
+            --radius-2xl: 22px;
             --radius-xl: 16px;
             --radius-lg: 12px;
-            --radius-md: 8px;
+            --radius-md: 9px;
             --radius-sm: 6px;
-            --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        /* ── Dark Theme (Professional Deep Slate) ── */
-        [data-theme="dark"] {
-            --bg-base: #0B0F17;
-            --bg-surface: rgba(18, 24, 38, 0.85);
-            --bg-surface-elevated: #1E293B;
-            --bg-surface-hover: #26334D;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-focus: #3B82F6;
-            --text-main: #F8FAFC;
-            --text-muted: #94A3B8;
-            --text-faint: #64748B;
+            --radius-pill: 9999px;
             
-            --primary: #3B82F6;
-            --primary-hover: #2563EB;
-            --primary-bg: rgba(59, 130, 246, 0.15);
-
-            --sev-critical: #EF4444;
-            --sev-critical-bg: rgba(239, 68, 68, 0.15);
-            --sev-high: #F97316;
-            --sev-high-bg: rgba(249, 115, 22, 0.15);
-            --sev-medium: #F59E0B;
-            --sev-medium-bg: rgba(245, 158, 11, 0.15);
-            --sev-low: #10B981;
-            --sev-low-bg: rgba(16, 185, 129, 0.15);
-
-            --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.05);
-            --shadow-float: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
-            --backdrop-blur: blur(20px);
+            /* Spring Physics */
+            --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-all: all 0.26s var(--ease-spring);
         }
 
-        /* ── Light Theme (Clean Crisp Minimalist) ── */
+        /* ── LIGHT THEME (Apple visionOS Liquid Quartz Glass) ── */
         [data-theme="light"] {
-            --bg-base: #F8FAFC;
-            --bg-surface: rgba(255, 255, 255, 0.88);
-            --bg-surface-elevated: #FFFFFF;
-            --bg-surface-hover: #F1F5F9;
-            --border-subtle: rgba(0, 0, 0, 0.08);
-            --border-focus: #2563EB;
-            --text-main: #0F172A;
-            --text-muted: #64748B;
-            --text-faint: #94A3B8;
+            --bg-canvas: #E8EEF5;
+            
+            /* Liquid Translucency Layers */
+            --bg-glass: rgba(255, 255, 255, 0.65);
+            --bg-glass-elevated: rgba(255, 255, 255, 0.78);
+            --bg-glass-card: rgba(255, 255, 255, 0.60);
+            --bg-glass-card-hover: rgba(255, 255, 255, 0.85);
+            --bg-glass-inset: rgba(240, 244, 250, 0.50);
+            
+            /* Specular Refractions & Prismatic Highlights */
+            --border-glass: rgba(255, 255, 255, 0.75);
+            --border-subtle: rgba(15, 23, 42, 0.07);
+            --border-highlight: rgba(15, 23, 42, 0.14);
+            --border-specular: inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1.5px 0 rgba(0, 0, 0, 0.03);
+            --border-card-specular: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.9), inset 0 -0.5px 1px 0 rgba(0, 0, 0, 0.02);
+            --border-focus: #0071E3;
+            
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-tertiary: #94A3B8;
+            
+            --primary: #0071E3;
+            --primary-hover: #0077ED;
+            --primary-glow: rgba(0, 113, 227, 0.28);
+            --primary-bg: rgba(0, 113, 227, 0.10);
+            --primary-border: rgba(0, 113, 227, 0.25);
 
-            --primary: #2563EB;
-            --primary-hover: #1D4ED8;
-            --primary-bg: rgba(37, 99, 235, 0.1);
+            /* Anomaly Category Colors (Apple Palette) */
+            --color-pothole: #FF3B30;
+            --color-pothole-bg: rgba(255, 59, 48, 0.12);
+            --color-crack: #FF9500;
+            --color-crack-bg: rgba(255, 149, 0, 0.12);
+            --color-manhole: #AF52DE;
+            --color-manhole-bg: rgba(175, 82, 222, 0.12);
+            --color-water: #007AFF;
+            --color-water-bg: rgba(0, 122, 255, 0.12);
+            --color-sewage: #00C7BE;
+            --color-sewage-bg: rgba(0, 199, 190, 0.12);
+            --color-garbage: #FF2D55;
+            --color-garbage-bg: rgba(255, 45, 85, 0.12);
+            --color-repaired: #34C759;
+            --color-repaired-bg: rgba(52, 199, 89, 0.12);
 
-            --sev-critical: #DC2626;
-            --sev-critical-bg: rgba(220, 38, 38, 0.1);
-            --sev-high: #EA580C;
-            --sev-high-bg: rgba(234, 88, 12, 0.1);
-            --sev-medium: #D97706;
-            --sev-medium-bg: rgba(217, 119, 6, 0.1);
-            --sev-low: #059669;
-            --sev-low-bg: rgba(5, 150, 105, 0.1);
+            --shadow-glass: 0 20px 48px -10px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.6);
+            --shadow-float: 0 32px 64px -14px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.8);
+            --shadow-card: 0 4px 14px -2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.5);
+            --backdrop-blur: blur(48px) saturate(240%) contrast(104%);
+            --backdrop-card-blur: blur(28px) saturate(190%);
+        }
 
-            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 0 1px 1px rgba(0, 0, 0, 0.05);
-            --shadow-float: 0 20px 35px -10px rgba(0, 0, 0, 0.1);
-            --backdrop-blur: blur(20px);
+        /* ── DARK THEME (Apple Obsidian Pro / Space Glass) ── */
+        [data-theme="dark"] {
+            --bg-canvas: #05080E;
+            
+            /* Liquid Translucency Layers */
+            --bg-glass: rgba(13, 19, 33, 0.62);
+            --bg-glass-elevated: rgba(18, 27, 47, 0.76);
+            --bg-glass-card: rgba(21, 31, 54, 0.55);
+            --bg-glass-card-hover: rgba(28, 42, 72, 0.75);
+            --bg-glass-inset: rgba(8, 12, 22, 0.50);
+            
+            /* Specular Refractions & Prismatic Highlights */
+            --border-glass: rgba(255, 255, 255, 0.16);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(255, 255, 255, 0.20);
+            --border-specular: inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 1.5px 0 rgba(0, 0, 0, 0.6);
+            --border-card-specular: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.14), inset 0 -0.5px 1px 0 rgba(0, 0, 0, 0.4);
+            --border-focus: #0A84FF;
+            
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-tertiary: #64748B;
+            
+            --primary: #0A84FF;
+            --primary-hover: #2997FF;
+            --primary-glow: rgba(10, 132, 255, 0.45);
+            --primary-bg: rgba(10, 132, 255, 0.16);
+            --primary-border: rgba(10, 132, 255, 0.35);
+
+            --color-pothole: #FF453A;
+            --color-pothole-bg: rgba(255, 69, 58, 0.18);
+            --color-crack: #FF9F0A;
+            --color-crack-bg: rgba(255, 159, 10, 0.18);
+            --color-manhole: #BF5AF2;
+            --color-manhole-bg: rgba(191, 90, 242, 0.18);
+            --color-water: #64D2FF;
+            --color-water-bg: rgba(100, 210, 255, 0.18);
+            --color-sewage: #63E6E2;
+            --color-sewage-bg: rgba(99, 230, 226, 0.18);
+            --color-garbage: #FF375F;
+            --color-garbage-bg: rgba(255, 55, 95, 0.18);
+            --color-repaired: #30D158;
+            --color-repaired-bg: rgba(48, 209, 88, 0.18);
+
+            --shadow-glass: 0 24px 56px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            --shadow-float: 0 36px 72px -16px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12);
+            --shadow-card: 0 6px 18px -3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+            --backdrop-blur: blur(48px) saturate(240%) contrast(104%);
+            --backdrop-card-blur: blur(28px) saturate(190%);
         }
 
         /* ═══════════════════════════════════════════════════════════════
-           BASE STYLES
+           LAYOUT RESET
            ═══════════════════════════════════════════════════════════════ */
         *, *::before, *::after {
             box-sizing: border-box;
@@ -102,8 +159,8 @@
 
         body {
             font-family: var(--font-sans);
-            background-color: var(--bg-base);
-            color: var(--text-main);
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
             height: 100vh;
             width: 100vw;
             overflow: hidden;
@@ -112,939 +169,1621 @@
 
         button, input, select {
             font-family: inherit;
+            color: inherit;
         }
 
-        /* ═══════════════════════════════════════════════════════════════
-           LAYOUT ARCHITECTURE
-           ═══════════════════════════════════════════════════════════════ */
-        .app-container {
+        .app-viewport {
             display: flex;
             height: 100vh;
             width: 100vw;
             position: relative;
+            overflow: hidden;
         }
 
-        /* Top Navigation Header */
-        .top-navbar {
+        /* ═══════════════════════════════════════════════════════════════
+           SPLASH STARTUP SCREEN
+           ═══════════════════════════════════════════════════════════════ */
+        .splash-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s var(--ease-smooth), visibility 0.6s var(--ease-smooth);
+        }
+
+        .splash-overlay.dismissed {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .splash-overlay img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .splash-enter-btn {
             position: absolute;
-            top: 14px;
-            left: calc(var(--sidebar-width) + 30px);
-            right: 20px;
-            height: var(--topbar-height);
-            background: var(--bg-surface);
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(28px) saturate(210%);
+            -webkit-backdrop-filter: blur(28px) saturate(210%);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1.5px 2px rgba(255, 255, 255, 0.8);
+            padding: 14px 36px;
+            font-family: var(--font-sans);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: transform 0.2s var(--ease-spring), background 0.2s ease;
+        }
+
+        .splash-enter-btn:hover {
+            background: rgba(255, 255, 255, 0.38);
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           FULLSCREEN GIS MAP CANVAS
+           ═══════════════════════════════════════════════════════════════ */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+            background: var(--bg-canvas);
+        }
+
+        /* Apple Maps Anomaly Pin with Glowing Pulse */
+        .apple-anomaly-pin-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .apple-anomaly-pin {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+            transition: transform 0.22s var(--ease-spring);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #FFFFFF;
+        }
+
+        .apple-anomaly-pin::after {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: -6px;
+            right: -6px;
+            bottom: -6px;
+            border-radius: 50%;
+            background: inherit;
+            opacity: 0.4;
+            animation: radar-beacon-pulse 2.2s infinite;
+            z-index: -1;
+        }
+
+        @keyframes radar-beacon-pulse {
+            0% { transform: scale(0.85); opacity: 0.6; }
+            50% { transform: scale(1.65); opacity: 0; }
+            100% { transform: scale(0.85); opacity: 0.6; }
+        }
+
+        .apple-anomaly-pin:hover {
+            transform: scale(1.4);
+            z-index: 99999;
+        }
+
+        .apple-cluster-pill {
+            background: var(--bg-glass-elevated);
             backdrop-filter: var(--backdrop-blur);
             -webkit-backdrop-filter: var(--backdrop-blur);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-card);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 13px;
+            font-weight: 800;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-glass), 0 0 24px var(--primary-glow), var(--border-specular);
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-glass-elevated) !important;
+            backdrop-filter: var(--backdrop-blur) !important;
+            -webkit-backdrop-filter: var(--backdrop-blur) !important;
+            color: var(--text-primary) !important;
+            border-radius: var(--radius-xl) !important;
+            border: 1px solid var(--border-glass) !important;
+            box-shadow: var(--shadow-float), var(--border-specular) !important;
+            padding: 0 !important;
+        }
+        .leaflet-popup-content {
+            margin: 12px !important;
+            line-height: 1.4 !important;
+        }
+        .leaflet-popup-tip {
+            background: var(--bg-glass-elevated) !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           TOP DYNAMIC ISLAND COMMAND HUD (Ultra Liquid Glass)
+           ═══════════════════════════════════════════════════════════════ */
+        .top-island-hud {
+            position: absolute;
+            top: 16px;
+            left: calc(var(--sidebar-width) + 32px);
+            right: 20px;
+            height: var(--topbar-height);
+            background: var(--bg-glass);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-glass), var(--border-specular);
+            border-radius: var(--radius-2xl);
             z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 20px;
-            transition: var(--transition-smooth);
+            padding: 0 16px;
+            gap: 12px;
+            transition: var(--transition-all);
         }
 
-        .nav-left {
+        .island-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
+            overflow-x: auto;
+            scrollbar-width: none;
         }
 
-        .status-pill {
+        .island-left::-webkit-scrollbar { display: none; }
+
+        .radar-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 12px;
-            background: var(--sev-low-bg);
-            color: var(--sev-low);
+            padding: 6px 13px;
+            background: var(--color-repaired-bg);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            color: var(--color-repaired);
             font-size: 12px;
-            font-weight: 600;
-            border-radius: 999px;
-            border: 1px solid rgba(16, 185, 129, 0.2);
+            font-weight: 700;
+            border-radius: var(--radius-pill);
+            border: 1px solid rgba(52, 199, 89, 0.35);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
+        .radar-beacon {
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
-            background-color: var(--sev-low);
-            animation: pulse-dot 2s infinite;
+            background-color: var(--color-repaired);
+            animation: pulse-beacon 2s infinite;
         }
 
-        @keyframes pulse-dot {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px var(--sev-low); }
-            100% { transform: scale(0.95); opacity: 0.8; }
+        @keyframes pulse-beacon {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
         }
 
-        .city-nav {
+        /* Segmented City Capsule */
+        .city-capsule-strip {
             display: flex;
             align-items: center;
-            gap: 6px;
-            background: var(--bg-surface-elevated);
-            padding: 4px;
-            border-radius: var(--radius-md);
+            gap: 2px;
+            background: var(--bg-glass-inset);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            padding: 3px;
+            border-radius: var(--radius-pill);
             border: 1px solid var(--border-subtle);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
-        .city-btn {
+        .city-segment-btn {
             background: transparent;
             border: none;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             font-size: 12px;
             font-weight: 600;
             padding: 5px 12px;
-            border-radius: var(--radius-sm);
+            border-radius: var(--radius-pill);
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
+            white-space: nowrap;
         }
 
-        .city-btn:hover {
-            color: var(--text-main);
-            background: var(--bg-surface-hover);
+        .city-segment-btn:hover {
+            color: var(--text-primary);
         }
 
-        .city-btn.active {
+        .city-segment-btn.active {
+            background: var(--bg-glass-elevated);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
             color: var(--primary);
-            background: var(--primary-bg);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), var(--border-card-specular);
+            border: 1px solid var(--border-glass);
         }
 
-        .nav-right {
+        .island-right {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
-        .tool-btn {
+        .island-pill-btn {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: var(--bg-surface-elevated);
-            color: var(--text-main);
-            border: 1px solid var(--border-subtle);
-            padding: 7px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            border-radius: var(--radius-md);
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            color: var(--text-primary);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            padding: 7px 13px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: var(--radius-lg);
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
+            white-space: nowrap;
         }
 
-        .tool-btn:hover {
-            background: var(--bg-surface-hover);
-            border-color: var(--border-focus);
+        .island-pill-btn:hover {
+            background: var(--bg-glass-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
         }
 
-        /* ── Floating Left Sidebar (Command Dashboard) ── */
-        .sidebar {
+        .island-pill-btn.active {
+            background: var(--primary-bg);
+            color: var(--primary);
+            border-color: var(--primary-border);
+            font-weight: 700;
+            box-shadow: 0 0 16px var(--primary-glow), var(--border-card-specular);
+        }
+
+        .theme-circle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-pill);
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            cursor: pointer;
+            color: var(--text-primary);
+            transition: var(--transition-all);
+        }
+
+        .theme-circle-btn:hover {
+            background: var(--bg-glass-card-hover);
+            color: var(--primary);
+            transform: rotate(15deg);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           SIDEBAR COMMAND PANEL (Pure Apple Liquid Glass Sheet)
+           ═══════════════════════════════════════════════════════════════ */
+        .sidebar-command-panel {
             position: absolute;
-            top: 14px;
-            bottom: 14px;
-            left: 14px;
+            top: 16px;
+            bottom: 16px;
+            left: 16px;
             width: var(--sidebar-width);
-            background: var(--bg-surface);
+            background: var(--bg-glass);
             backdrop-filter: var(--backdrop-blur);
             -webkit-backdrop-filter: var(--backdrop-blur);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow-float);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-float), var(--border-specular);
+            border-radius: var(--radius-3xl);
             z-index: 1000;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            transition: var(--transition-all);
         }
 
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-subtle);
+        /* Brand Row */
+        .brand-dock-header {
+            padding: 18px 20px 14px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
-        .brand {
+        .brand-lockup {
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
-        .brand-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--primary), #8B5CF6);
-            border-radius: var(--radius-md);
+        .brand-logo-frame {
+            width: 42px;
+            height: 42px;
+            border-radius: var(--radius-lg);
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            flex-shrink: 0;
+            padding: 4px;
         }
 
-        .brand-text h1 {
+        .brand-logo-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .brand-headings h1 {
             font-family: var(--font-heading);
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            color: var(--text-main);
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            color: var(--text-primary);
+            line-height: 1.15;
         }
 
-        .brand-text p {
+        .brand-headings p {
             font-size: 11px;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             font-weight: 500;
         }
 
-        /* KPI Statistics Grid */
-        .kpi-section {
-            padding: 16px 20px;
+        /* KPI Quick Metrics - Translucent Glass Tiles */
+        .kpi-row-deck {
+            padding: 12px 20px;
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
             border-bottom: 1px solid var(--border-subtle);
+            background: transparent;
         }
 
-        .kpi-card {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
+        .kpi-glass-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-xl);
             padding: 12px 14px;
             display: flex;
             flex-direction: column;
             gap: 4px;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
         }
 
-        .kpi-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            transform: translateY(-1px);
+        .kpi-glass-card:hover {
+            background: var(--bg-glass-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glass);
         }
 
-        .kpi-label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-        }
-
-        .kpi-val-row {
+        .kpi-glass-top {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             justify-content: space-between;
         }
 
-        .kpi-value {
-            font-family: var(--font-heading);
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .kpi-badge {
+        .kpi-glass-lbl {
             font-size: 11px;
-            font-weight: 600;
-            padding: 2px 6px;
-            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-secondary);
         }
 
-        /* Control & Filter Strip */
-        .controls-section {
-            padding: 14px 20px;
+        .kpi-glass-pill {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: var(--radius-pill);
+        }
+
+        .kpi-glass-val {
+            font-family: var(--font-heading);
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+
+        .kpi-glass-meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        /* Anomaly Category Selector Bar (Multi-Anomaly Filter) */
+        .category-filter-console {
+            padding: 10px 20px;
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .filter-row {
+        .category-scroll-strip {
             display: flex;
             align-items: center;
             gap: 6px;
             overflow-x: auto;
             scrollbar-width: none;
+            padding: 2px 0;
         }
 
-        .filter-chip {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
-            font-size: 12px;
-            font-weight: 500;
+        .category-scroll-strip::-webkit-scrollbar { display: none; }
+
+        .category-chip {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--border-card-specular);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
             padding: 5px 12px;
-            border-radius: 999px;
+            border-radius: var(--radius-pill);
             cursor: pointer;
             white-space: nowrap;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
 
-        .filter-chip:hover {
-            color: var(--text-main);
-            border-color: var(--border-focus);
+        .category-chip:hover {
+            background: var(--bg-glass-card-hover);
+            color: var(--text-primary);
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
         }
 
-        .filter-chip.active {
+        .category-chip.active {
             background: var(--primary-bg);
             color: var(--primary);
-            border-color: var(--primary);
-            font-weight: 600;
+            border-color: var(--primary-border);
+            font-weight: 800;
+            box-shadow: 0 0 16px var(--primary-glow), var(--border-card-specular);
         }
 
-        /* Tabs Section */
-        .feed-tabs {
+        .search-liquid-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--border-card-specular);
+            border-radius: var(--radius-pill);
+            padding: 8px 14px;
+            transition: var(--transition-all);
+        }
+
+        .search-liquid-bar:focus-within {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px var(--primary-bg), var(--border-card-specular);
+            background: var(--bg-glass-card-hover);
+        }
+
+        .search-liquid-bar input {
+            background: transparent;
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        /* View Mode Tabs */
+        .sidebar-view-tabs {
             display: flex;
             padding: 0 20px;
             border-bottom: 1px solid var(--border-subtle);
-            gap: 16px;
+            gap: 20px;
         }
 
-        .feed-tab {
-            padding: 12px 0;
+        .view-tab-btn {
+            padding: 11px 0;
             background: none;
             border: none;
             border-bottom: 2px solid transparent;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .feed-tab:hover {
-            color: var(--text-main);
+        .view-tab-btn:hover {
+            color: var(--text-primary);
         }
 
-        .feed-tab.active {
+        .view-tab-btn.active {
             color: var(--primary);
             border-bottom-color: var(--primary);
         }
 
-        /* Feed List */
-        .feed-container {
+        /* Scrollable Feed Container */
+        .feed-scroll-hub {
             flex: 1;
             overflow-y: auto;
-            padding: 14px 20px;
+            padding: 12px 20px;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .feed-container::-webkit-scrollbar {
-            width: 4px;
-        }
-        .feed-container::-webkit-scrollbar-thumb {
+        .feed-scroll-hub::-webkit-scrollbar { width: 4px; }
+        .feed-scroll-hub::-webkit-scrollbar-thumb {
             background: var(--border-subtle);
             border-radius: 4px;
         }
 
-        .pothole-card {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: 14px;
+        /* Anomaly Defect Card - Liquid Glass Tile */
+        .anomaly-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-xl);
+            padding: 13px;
             cursor: pointer;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .pothole-card:hover {
+        .anomaly-card:hover {
+            background: var(--bg-glass-card-hover);
             border-color: var(--primary);
             transform: translateY(-2px);
-            box-shadow: var(--shadow-card);
+            box-shadow: var(--shadow-glass), 0 0 20px var(--primary-glow);
         }
 
-        .card-header {
+        .card-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
         .card-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-main);
             display: flex;
             align-items: center;
             gap: 6px;
-        }
-
-        .severity-badge {
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 700;
-            padding: 3px 8px;
-            border-radius: var(--radius-sm);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
         }
 
-        .card-stats {
+        .card-sev-pill {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: var(--radius-pill);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .card-body {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .card-thumb {
+            width: 58px;
+            height: 58px;
+            border-radius: var(--radius-lg);
+            object-fit: cover;
+            background: var(--bg-glass-inset);
+            border: 1px solid var(--border-glass);
+            flex-shrink: 0;
+        }
+
+        .card-telemetry {
+            flex: 1;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 6px;
-            background: var(--bg-base);
-            padding: 8px;
-            border-radius: var(--radius-sm);
+            background: var(--bg-glass-inset);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-subtle);
+            padding: 7px 9px;
+            border-radius: var(--radius-md);
         }
 
-        .stat-item {
+        .telemetry-item {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
 
-        .stat-lbl {
-            font-size: 10px;
-            color: var(--text-faint);
+        .telemetry-lbl {
+            font-size: 9px;
+            color: var(--text-tertiary);
             text-transform: uppercase;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.3px;
         }
 
-        .stat-val {
+        .telemetry-val {
             font-size: 12px;
-            font-weight: 600;
-            color: var(--text-main);
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
         }
 
-        /* Bottom Action Bar */
-        .sidebar-footer {
-            padding: 16px 20px;
-            border-top: 1px solid var(--border-subtle);
+        /* Analytics Tab UI - Frosted Glass Panels */
+        .analytics-deck {
             display: flex;
-            gap: 10px;
-            background: var(--bg-surface);
+            flex-direction: column;
+            gap: 14px;
+            padding: 4px 0;
         }
 
-        .btn-primary {
-            flex: 1;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: var(--radius-md);
-            cursor: pointer;
+        .rqi-summary-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-xl);
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rqi-summary-left h3 {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .rqi-summary-left p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .rqi-dial {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: var(--primary-bg);
+            border: 2px solid var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            transition: var(--transition-smooth);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+            font-family: var(--font-heading);
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            box-shadow: 0 4px 16px var(--primary-glow);
         }
 
-        .btn-primary:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
+        .distribution-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-xl);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .btn-secondary {
-            background: var(--bg-surface-elevated);
-            color: var(--text-main);
+        .dist-title {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .dist-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .dist-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .dist-track {
+            height: 6px;
+            background: var(--bg-glass-inset);
+            border-radius: var(--radius-pill);
+            overflow: hidden;
             border: 1px solid var(--border-subtle);
-            padding: 10px 14px;
-            font-size: 13px;
-            font-weight: 500;
-            border-radius: var(--radius-md);
+        }
+
+        .dist-fill {
+            height: 100%;
+            border-radius: var(--radius-pill);
+            transition: width 0.7s var(--ease-spring);
+        }
+
+        /* Action Dock Footer */
+        .sidebar-action-dock {
+            padding: 14px 20px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            gap: 8px;
+            background: transparent;
+        }
+
+        .btn-dock-primary {
+            flex: 1;
+            background: var(--primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 11px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: var(--radius-lg);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            text-decoration: none;
-            transition: var(--transition-smooth);
+            transition: var(--transition-all);
+            box-shadow: 0 4px 16px var(--primary-glow);
         }
 
-        .btn-secondary:hover {
-            background: var(--bg-surface-hover);
-            border-color: var(--border-focus);
+        .btn-dock-primary:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
         }
 
-        /* ── Fullscreen Map ── */
-        #map {
-            height: 100vh;
-            width: 100vw;
-            z-index: 1;
-            background-color: var(--bg-base);
-        }
-
-        /* ── Modern Map Markers & Pulsing Pins ── */
-        .custom-pothole-pin {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .custom-pothole-pin:hover {
-            transform: scale(1.3);
-            z-index: 9999;
-        }
-
-        .custom-cluster-icon {
-            background: var(--bg-surface-elevated);
-            color: var(--text-main);
-            font-family: var(--font-heading);
+        .btn-dock-secondary {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            color: var(--text-primary);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--border-card-specular);
+            padding: 11px 13px;
             font-size: 12px;
             font-weight: 700;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            border: 2px solid var(--primary);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+            gap: 5px;
+            text-decoration: none;
+            transition: var(--transition-all);
         }
 
-        /* ── Modern Pothole Inspector Drawer ── */
-        .drawer-overlay {
+        .btn-dock-secondary:hover {
+            background: var(--bg-glass-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           RIGHT MAP CONTROLS & SPATIAL LEGEND (Frosted Glass)
+           ═══════════════════════════════════════════════════════════════ */
+        .floating-map-tools {
+            position: absolute;
+            top: calc(var(--topbar-height) + 28px);
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .map-tool-icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-lg);
+            background: var(--bg-glass);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-glass), var(--border-specular);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition-all);
+        }
+
+        .map-tool-icon-btn:hover {
+            background: var(--bg-glass-elevated);
+            color: var(--primary);
+            transform: scale(1.06);
+        }
+
+        .map-tool-icon-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 0 16px var(--primary-glow);
+        }
+
+        .spatial-legend-card {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-glass);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-glass), var(--border-specular);
+            border-radius: var(--radius-xl);
+            padding: 12px 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 210px;
+        }
+
+        .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .legend-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .legend-color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           DEFECT DETAIL INSPECTOR DRAWER (macOS Liquid Glass Sheet)
+           ═══════════════════════════════════════════════════════════════ */
+        .drawer-scrim {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(8px);
             z-index: 2000;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.28s var(--ease-spring);
         }
 
-        .drawer-overlay.active {
+        .drawer-scrim.active {
             opacity: 1;
             pointer-events: auto;
         }
 
-        .drawer-content {
+        .drawer-panel {
             position: fixed;
-            top: 14px;
-            bottom: 14px;
-            right: 14px;
-            width: 440px;
-            background: var(--bg-surface);
+            top: 16px;
+            bottom: 16px;
+            right: 16px;
+            width: 460px;
+            max-width: calc(100vw - 32px);
+            background: var(--bg-glass-elevated);
             backdrop-filter: var(--backdrop-blur);
             -webkit-backdrop-filter: var(--backdrop-blur);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow-float);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-float), var(--border-specular);
+            border-radius: var(--radius-3xl);
             z-index: 2001;
-            transform: translateX(120%);
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateX(115%);
+            transition: transform 0.35s var(--ease-spring);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        .drawer-overlay.active .drawer-content {
+        .drawer-scrim.active .drawer-panel {
             transform: translateX(0);
         }
 
-        .drawer-header {
-            padding: 18px 20px;
+        .drawer-head {
+            padding: 18px 22px;
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
-        .drawer-title {
+        .drawer-head-title {
             font-family: var(--font-heading);
             font-size: 16px;
-            font-weight: 700;
-            color: var(--text-main);
+            font-weight: 800;
+            color: var(--text-primary);
         }
 
-        .drawer-close {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
+        .drawer-close-btn {
+            background: var(--bg-glass-inset);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            color: var(--text-secondary);
             cursor: pointer;
-            padding: 4px;
-            border-radius: var(--radius-sm);
+            padding: 6px;
+            border-radius: var(--radius-pill);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-all);
         }
 
-        .drawer-close:hover {
-            color: var(--text-main);
-            background: var(--bg-surface-hover);
+        .drawer-close-btn:hover {
+            color: var(--text-primary);
+            transform: scale(1.1);
         }
 
-        .drawer-body {
+        .drawer-scroll-body {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 20px 22px;
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
 
-        .preview-image {
+        .drawer-media-frame {
+            position: relative;
             width: 100%;
-            height: 200px;
-            object-fit: cover;
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border-subtle);
-            background: var(--bg-surface-elevated);
+            height: 230px;
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            background: var(--bg-glass-inset);
+            box-shadow: var(--shadow-card);
         }
 
-        .meta-grid {
+        .drawer-media-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .drawer-media-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.65);
+            color: #FFFFFF;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: var(--radius-pill);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .drawer-meta-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
         }
 
-        .meta-box {
-            background: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
+        .meta-card {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-lg);
             padding: 10px 12px;
         }
 
-        .meta-lbl {
-            font-size: 11px;
-            color: var(--text-faint);
+        .meta-tag-lbl {
+            font-size: 10px;
+            color: var(--text-tertiary);
             text-transform: uppercase;
-            font-weight: 600;
+            font-weight: 800;
+            letter-spacing: 0.4px;
         }
 
-        .meta-val {
+        .meta-tag-val {
             font-size: 13px;
-            font-weight: 600;
-            color: var(--text-main);
+            font-weight: 800;
+            color: var(--text-primary);
             margin-top: 2px;
         }
 
-        .timeline-section {
+        .coords-card-span {
+            grid-column: span 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-card), var(--border-card-specular);
+            border-radius: var(--radius-lg);
+            padding: 10px 14px;
+        }
+
+        .coords-copy-pill {
+            background: var(--primary-bg);
+            color: var(--primary);
+            border: 1px solid var(--primary-border);
+            padding: 5px 11px;
+            border-radius: var(--radius-pill);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: var(--transition-all);
+        }
+
+        .coords-copy-pill:hover {
+            background: var(--primary);
+            color: #FFFFFF;
+        }
+
+        .timeline-box {
             border-top: 1px solid var(--border-subtle);
             padding-top: 14px;
         }
 
-        .timeline-title {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--text-muted);
+        .timeline-box-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
 
-        .timeline-item {
+        .history-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
-            background: var(--bg-surface-elevated);
-            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--border-card-specular);
+            border-radius: var(--radius-md);
             margin-bottom: 6px;
             font-size: 12px;
         }
 
-        /* ── Leaflet Popup Restyling ── */
-        .leaflet-popup-content-wrapper {
-            background: var(--bg-surface-elevated) !important;
-            color: var(--text-main) !important;
-            border-radius: var(--radius-lg) !important;
-            border: 1px solid var(--border-subtle) !important;
-            box-shadow: var(--shadow-float) !important;
-            padding: 0 !important;
-        }
-        .leaflet-popup-content {
-            margin: 14px !important;
-            line-height: 1.4 !important;
-        }
-        .leaflet-popup-tip {
-            background: var(--bg-surface-elevated) !important;
+        /* ═══════════════════════════════════════════════════════════════
+           TOAST NOTIFICATION DOCK
+           ═══════════════════════════════════════════════════════════════ */
+        .toast-dock {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
         }
 
-        /* Responsive Breakpoints */
-        @media (max-width: 900px) {
-            .sidebar {
-                width: calc(100vw - 28px);
-                height: 45vh;
-                top: auto;
-                bottom: 14px;
-            }
-            .top-navbar {
-                left: 14px;
-            }
+        .toast-capsule {
+            background: var(--bg-glass-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--shadow-float), var(--border-specular);
+            backdrop-filter: var(--backdrop-blur);
+            -webkit-backdrop-filter: var(--backdrop-blur);
+            border-radius: var(--radius-xl);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            pointer-events: auto;
+            transform: translateY(24px) scale(0.96);
+            opacity: 0;
+            transition: all 0.3s var(--ease-spring);
+        }
+
+        .toast-capsule.active {
+            transform: translateY(0) scale(1);
+            opacity: 1;
         }
     </style>
 </head>
 <body>
 
-    <div class="app-container">
-        <!-- TOP NAVIGATION BAR -->
-        <header class="top-navbar">
-            <div class="nav-left">
-                <div class="status-pill">
-                    <div class="status-dot"></div>
-                    <span id="live-status-text">Live Radar Active</span>
+    <!-- 16:9 SPLASH STARTUP SCREEN -->
+    <div class="splash-overlay" id="splash-screen">
+        <img src="/static/flux-splash.jpg" alt="Flux — Enterprise Road Intelligence Platform">
+        <button class="splash-enter-btn" onclick="dismissSplash()">Launch Dashboard →</button>
+    </div>
+
+    <div class="app-viewport">
+        <!-- 100% FREE GIS MAP ENGINE -->
+        <div id="map"></div>
+
+        <!-- TOP FLOATING ISLAND HUD (Ultra Liquid Glass) -->
+        <header class="top-island-hud">
+            <div class="island-left">
+                <div class="radar-badge">
+                    <div class="radar-beacon"></div>
+                    <span id="radar-status-label">Live Radar Active</span>
                 </div>
-                <div class="city-nav">
-                    <button class="city-btn" onclick="flyToCity(33.72, 73.09, 13)">Islamabad</button>
-                    <button class="city-btn" onclick="flyToCity(31.52, 74.35, 13)">Lahore</button>
-                    <button class="city-btn" onclick="flyToCity(24.86, 67.01, 13)">Karachi</button>
-                    <button class="city-btn active" onclick="flyToCity(30.2, 70.0, 6)">All Regions</button>
+
+                <div class="city-capsule-strip">
+                    <button class="city-segment-btn active" onclick="focusRegion(30.2, 70.0, 6, this)">All Regions</button>
+                    <button class="city-segment-btn" onclick="focusRegion(33.72, 73.09, 13, this)">Islamabad</button>
+                    <button class="city-segment-btn" onclick="focusRegion(33.60, 73.05, 13, this)">Rawalpindi</button>
+                    <button class="city-segment-btn" onclick="focusRegion(31.52, 74.35, 13, this)">Lahore</button>
+                    <button class="city-segment-btn" onclick="focusRegion(24.86, 67.01, 13, this)">Karachi</button>
+                    <button class="city-segment-btn" onclick="focusRegion(34.01, 71.52, 13, this)">Peshawar</button>
                 </div>
             </div>
 
-            <div class="nav-right">
-                <select id="map-style-select" class="tool-btn" onchange="changeMapStyle(this.value)">
-                    <option value="osm-dark">Map: Dark Canvas</option>
-                    <option value="osm-streets">Map: OpenStreetMap Streets</option>
-                    <option value="osm-hot">Map: Humanitarian View</option>
-                    <option value="esri-imagery">Map: Satellite Imagery</option>
-                </select>
-
-                <button class="tool-btn" id="btn-dedup-toggle" onclick="toggleDeduplication()">
-                    <i data-lucide="layers" style="width:14px;height:14px;"></i>
-                    <span id="dedup-label">Canonical (Dedup: ON)</span>
+            <div class="island-right">
+                <button class="island-pill-btn" id="btn-heat-hud" onclick="toggleHeatmap()">
+                    <i data-lucide="flame" style="width:14px;height:14px;"></i>
+                    <span id="heat-label">Heatmap</span>
                 </button>
 
-                <button class="tool-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
-                    <i data-lucide="sun" id="theme-icon" style="width:14px;height:14px;"></i>
+                <button class="island-pill-btn active" id="btn-dedup-hud" onclick="toggleDeduplication()">
+                    <i data-lucide="layers" style="width:14px;height:14px;"></i>
+                    <span id="dedup-label">Canonical (ON)</span>
+                </button>
+
+                <button class="theme-circle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme">
+                    <i data-lucide="moon" id="theme-indicator" style="width:16px;height:16px;"></i>
                 </button>
             </div>
         </header>
 
-        <!-- FLOATING LEFT SIDEBAR -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="brand">
-                    <div class="brand-icon">
-                        <i data-lucide="activity" style="width:20px;height:20px;"></i>
+        <!-- FLOATING SIDEBAR COMMAND PANEL (Apple Liquid Glass Sheet) -->
+        <aside class="sidebar-command-panel">
+            <!-- Brand Row -->
+            <div class="brand-dock-header">
+                <div class="brand-lockup">
+                    <div class="brand-logo-frame">
+                        <img src="/static/flux-logo.png" id="brand-logo-img" alt="Flux Road Logo">
                     </div>
-                    <div class="brand-text">
-                        <h1>Flux Intelligence</h1>
-                        <p>Municipal Road Defect Surveillance</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- KPI STATISTICS CARDS -->
-            <div class="kpi-section">
-                <div class="kpi-card">
-                    <span class="kpi-label">Active Potholes</span>
-                    <div class="kpi-val-row">
-                        <span class="kpi-value" id="kpi-total">0</span>
-                        <span class="kpi-badge" style="background:var(--primary-bg);color:var(--primary)">Live</span>
-                    </div>
-                </div>
-                <div class="kpi-card">
-                    <span class="kpi-label">Critical Hazards</span>
-                    <div class="kpi-val-row">
-                        <span class="kpi-value" id="kpi-critical" style="color:var(--sev-critical)">0</span>
-                        <span class="kpi-badge" style="background:var(--sev-critical-bg);color:var(--sev-critical)">Urgent</span>
+                    <div class="brand-headings">
+                        <h1>Flux</h1>
+                        <p>Enterprise Road Defect & Municipal Anomaly Intelligence</p>
                     </div>
                 </div>
             </div>
 
-            <!-- FILTER CONTROLS -->
-            <div class="controls-section">
-                <div class="filter-row">
-                    <button class="filter-chip active" onclick="setSeverityFilter('all', this)">All Severities</button>
-                    <button class="filter-chip" onclick="setSeverityFilter('Critical', this)" style="color:var(--sev-critical)">Critical</button>
-                    <button class="filter-chip" onclick="setSeverityFilter('High', this)" style="color:var(--sev-high)">High</button>
-                    <button class="filter-chip" onclick="setSeverityFilter('Medium', this)" style="color:var(--sev-medium)">Moderate</button>
-                    <button class="filter-chip" onclick="setSeverityFilter('Low', this)" style="color:var(--sev-low)">Minor</button>
+            <!-- KPI Tiles (Translucent Glass) -->
+            <div class="kpi-row-deck">
+                <div class="kpi-glass-card">
+                    <div class="kpi-glass-top">
+                        <span class="kpi-glass-lbl">Active Hazards</span>
+                        <span class="kpi-glass-pill" style="background:var(--primary-bg); color:var(--primary);">Live</span>
+                    </div>
+                    <span class="kpi-glass-val" id="kpi-active-count">0</span>
+                    <span class="kpi-glass-meta" id="kpi-obs-count">164 sensor passes</span>
+                </div>
+
+                <div class="kpi-glass-card">
+                    <div class="kpi-glass-top">
+                        <span class="kpi-glass-lbl">Critical Incidents</span>
+                        <span class="kpi-glass-pill" style="background:var(--color-pothole-bg); color:var(--color-pothole);">Urgent</span>
+                    </div>
+                    <span class="kpi-glass-val" id="kpi-critical-count" style="color:var(--color-pothole);">0</span>
+                    <span class="kpi-glass-meta">Dispatch required</span>
                 </div>
             </div>
 
-            <!-- TABS -->
-            <div class="feed-tabs">
-                <button class="feed-tab active" data-tab="active" onclick="switchTab('active')">Active Registry</button>
-                <button class="feed-tab" data-tab="urgent" onclick="switchTab('urgent')">Urgent Alerts</button>
+            <!-- Multi-Anomaly Category Filter Bar -->
+            <div class="category-filter-console">
+                <div class="search-liquid-bar">
+                    <i data-lucide="search" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
+                    <input type="text" id="defect-search-box" placeholder="Search ID, road name, anomaly type..." oninput="handleSearch(this.value)">
+                </div>
+
+                <div class="category-scroll-strip">
+                    <button class="category-chip active" onclick="filterByCategory('all', this)">All (80)</button>
+                    <button class="category-chip" onclick="filterByCategory('pothole', this)">🕳️ Potholes</button>
+                    <button class="category-chip" onclick="filterByCategory('crack', this)">⚡ Cracks</button>
+                    <button class="category-chip" onclick="filterByCategory('manhole', this)">⭕ Manholes</button>
+                    <button class="category-chip" onclick="filterByCategory('waterlogging', this)">🌊 Waterlog</button>
+                    <button class="category-chip" onclick="filterByCategory('sewage', this)">☣️ Sewage</button>
+                    <button class="category-chip" onclick="filterByCategory('garbage_dump', this)">🗑️ Dumps</button>
+                </div>
             </div>
 
-            <!-- ACTIVITY FEED -->
-            <div class="feed-container" id="feed-container">
-                <!-- Pothole items rendered here -->
-            </div>
-
-            <!-- FOOTER ACTIONS -->
-            <div class="sidebar-footer">
-                <button class="btn-primary" id="btn-seed" onclick="runSimulation()">
-                    <i data-lucide="plus-circle" style="width:16px;height:16px;"></i>
-                    <span>Simulate Ingestion</span>
+            <!-- View Tabs -->
+            <div class="sidebar-view-tabs">
+                <button class="view-tab-btn active" data-view="feed" onclick="switchViewMode('feed')">
+                    <i data-lucide="list" style="width:14px;height:14px;"></i>
+                    <span id="tab-feed-title">Anomalies Feed (80)</span>
                 </button>
-                <a href="/detections/export/geojson" download="flux_potholes.geojson" class="btn-secondary" title="Export GeoJSON">
+                <button class="view-tab-btn" data-view="analytics" onclick="switchViewMode('analytics')">
+                    <i data-lucide="pie-chart" style="width:14px;height:14px;"></i>
+                    <span>Road Quality HUD</span>
+                </button>
+            </div>
+
+            <!-- Feed / Analytics Hub -->
+            <div class="feed-scroll-hub" id="feed-scroll-hub">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Action Dock -->
+            <div class="sidebar-action-dock">
+                <button class="btn-dock-primary" id="btn-simulate-action" onclick="triggerSimulation()">
+                    <i data-lucide="plus-circle" style="width:15px;height:15px;"></i>
+                    <span>Simulate Ingest</span>
+                </button>
+                <a href="/detections/export/geojson" download="flux_anomalies.geojson" class="btn-dock-secondary" title="Export GeoJSON">
                     <i data-lucide="download" style="width:15px;height:15px;"></i>
                     <span>GeoJSON</span>
                 </a>
+                <button class="btn-dock-secondary" onclick="rebuildSpatialClusters()" title="Rebuild Clusters">
+                    <i data-lucide="refresh-cw" style="width:15px;height:15px;"></i>
+                </button>
             </div>
         </aside>
 
-        <!-- FULLSCREEN MAP -->
-        <div id="map"></div>
-    </div>
+        <!-- FLOATING MAP CONTROLS (RIGHT) -->
+        <div class="floating-map-tools">
+            <button class="map-tool-icon-btn" onclick="cycleMapLayers()" title="Switch Map Layer (OpenStreetMap / Esri Streets / Satellite / Humanitarian)">
+                <i data-lucide="map" style="width:16px;height:16px;"></i>
+            </button>
+            <button class="map-tool-icon-btn" onclick="toggleHeatmap()" id="side-heat-btn" title="Toggle Heatmap Density">
+                <i data-lucide="flame" style="width:16px;height:16px;"></i>
+            </button>
+            <button class="map-tool-icon-btn" onclick="map.zoomIn()" title="Zoom In">
+                <i data-lucide="plus" style="width:16px;height:16px;"></i>
+            </button>
+            <button class="map-tool-icon-btn" onclick="map.zoomOut()" title="Zoom Out">
+                <i data-lucide="minus" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
 
-    <!-- POTHOLE INSPECTOR DRAWER -->
-    <div class="drawer-overlay" id="inspector-overlay" onclick="closeInspector()">
-        <div class="drawer-content" onclick="event.stopPropagation()">
-            <div class="drawer-header">
-                <div class="drawer-title" id="drawer-pothole-title">Pothole Details</div>
-                <button class="drawer-close" onclick="closeInspector()">
-                    <i data-lucide="x" style="width:18px;height:18px;"></i>
-                </button>
+        <!-- FLOATING SPATIAL LEGEND (Frosted Glass) -->
+        <div class="spatial-legend-card">
+            <div class="legend-header">
+                <span>Hazard Legend</span>
+                <i data-lucide="info" style="width:12px;height:12px;"></i>
             </div>
-
-            <div class="drawer-body">
-                <img id="drawer-img" class="preview-image" src="" alt="Road Defect Capture" />
-
-                <div class="meta-grid">
-                    <div class="meta-box">
-                        <div class="meta-lbl">Severity Level</div>
-                        <div class="meta-val" id="drawer-sev">High</div>
-                    </div>
-                    <div class="meta-box">
-                        <div class="meta-lbl">Operational Status</div>
-                        <div class="meta-val" id="drawer-status">Active</div>
-                    </div>
-                    <div class="meta-box">
-                        <div class="meta-lbl">Multi-Pass Confirmations</div>
-                        <div class="meta-val" id="drawer-passes">1 Observation</div>
-                    </div>
-                    <div class="meta-box">
-                        <div class="meta-lbl">Model Confidence</div>
-                        <div class="meta-val" id="drawer-conf">95.4%</div>
-                    </div>
-                    <div class="meta-box" style="grid-column: span 2;">
-                        <div class="meta-lbl">GPS Centroid Coordinates</div>
-                        <div class="meta-val" id="drawer-coords">33.7200, 73.0900</div>
-                    </div>
+            <div class="legend-grid">
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-pothole);"></div>
+                    <span>🕳️ Pothole</span>
                 </div>
-
-                <div class="timeline-section" id="drawer-timeline-container">
-                    <div class="timeline-title">Observation History</div>
-                    <div id="drawer-timeline-list"></div>
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-crack);"></div>
+                    <span>⚡ Road Crack</span>
                 </div>
-
-                <div style="margin-top:auto; padding-top:14px; display:flex; gap:10px;" id="drawer-actions">
-                    <!-- Action buttons dynamically inserted -->
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-manhole);"></div>
+                    <span>⭕ Manhole</span>
+                </div>
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-water);"></div>
+                    <span>🌊 Waterlog</span>
+                </div>
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-sewage);"></div>
+                    <span>☣️ Sewage</span>
+                </div>
+                <div class="legend-row">
+                    <div class="legend-color-dot" style="background:var(--color-garbage);"></div>
+                    <span>🗑️ Dump</span>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- DEFECT DETAIL INSPECTOR DRAWER (macOS Liquid Glass Sheet) -->
+    <div class="drawer-scrim" id="inspector-scrim" onclick="dismissInspector()">
+        <div class="drawer-panel" onclick="event.stopPropagation()">
+            <div class="drawer-head">
+                <div class="drawer-head-title" id="drawer-head-title">Anomaly Profile</div>
+                <button class="drawer-close-btn" onclick="dismissInspector()">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+
+            <div class="drawer-scroll-body">
+                <div class="drawer-media-frame">
+                    <img id="drawer-media-img" class="drawer-media-img" src="" alt="Defect Snapshot" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100%25\' height=\'100%25\'><rect fill=\'%23F0F4F9\' width=\'100%25\' height=\'100%25\'/><text fill=\'%2364748B\' font-size=\'13\' font-family=\'sans-serif\' x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\'>Road Defect Ingested</text></svg>'">
+                    <div class="drawer-media-tag" id="drawer-media-tag">AI Surveillance Pass</div>
+                </div>
+
+                <div class="drawer-meta-grid">
+                    <div class="meta-card">
+                        <div class="meta-tag-lbl">Hazard Classification</div>
+                        <div class="meta-tag-val" id="drawer-class-val" style="color:var(--primary);">Pothole</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-tag-lbl">Severity Rating</div>
+                        <div class="meta-tag-val" id="drawer-sev-val">Critical</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-tag-lbl">Operational Status</div>
+                        <div class="meta-tag-val" id="drawer-status-val" style="text-transform:uppercase;">ACTIVE</div>
+                    </div>
+                    <div class="meta-card">
+                        <div class="meta-tag-lbl">Verified Sensor Passes</div>
+                        <div class="meta-tag-val" id="drawer-passes-val">3 Passes</div>
+                    </div>
+                    <div class="coords-card-span">
+                        <div>
+                            <div class="meta-tag-lbl">GPS Centroid Coordinates</div>
+                            <div class="meta-tag-val" id="drawer-coords-val" style="font-family:var(--font-mono);font-size:12px;">33.7200, 73.0900</div>
+                        </div>
+                        <button class="coords-copy-pill" onclick="copyDrawerCoordinates()">
+                            <i data-lucide="copy" style="width:12px;height:12px;"></i>
+                            <span>Copy</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="timeline-box">
+                    <div class="timeline-box-title">Observation History Timeline</div>
+                    <div id="drawer-timeline-rows"></div>
+                </div>
+
+                <div style="margin-top:auto; padding-top:12px; display:flex; gap:8px;" id="drawer-action-slot"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION DOCK -->
+    <div class="toast-dock" id="toast-dock"></div>
+
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
     <script>
-        // ── APPLICATION STATE ──
-        let geoData = null;
-        let activeTab = 'active';
-        let activeSeverity = 'all';
-        let isDeduplicated = true;
-        let currentMapTileLayer = null;
-        let sseConnection = null;
+        // ═══════════════════════════════════════════════════════════════
+        // STATE & VARIABLES
+        // ═══════════════════════════════════════════════════════════════
+        let fullFeatureCollection = [];
+        let activeViewMode = 'feed';
+        let currentCategoryFilter = 'all';
+        let filterSearchText = '';
+        let deduplicationActive = true;
+        let heatmapActive = false;
+        let activeTileLayer = null;
+        let activeTileIndex = 0;
+        let activeHeatmapLayer = null;
+        let sseSource = null;
 
-        // ── 100% FREE MAP TILE PROVIDERS (ZERO API KEYS & NO WATERMARKS) ──
-        const MAP_TILE_PROVIDERS = {
-            'osm-dark': {
-                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-                attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
-            },
-            'osm-streets': {
+        // 100% Free Zero-Watermark Tile Providers
+        const MAP_TILE_CONFIGS = [
+            {
+                name: 'OpenStreetMap Standard (Free)',
                 url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                subdomains: '',
+                attribution: '&copy; OpenStreetMap contributors'
             },
-            'osm-hot': {
+            {
+                name: 'Esri World Street Map (Free Public)',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+                subdomains: '',
+                attribution: '&copy; Esri'
+            },
+            {
+                name: 'Humanitarian OSM (Free)',
                 url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-                attribution: '&copy; OpenStreetMap contributors, Humanitarian OSM Team'
+                subdomains: 'abc',
+                attribution: '&copy; OpenStreetMap contributors, HOT'
             },
-            'esri-imagery': {
+            {
+                name: 'Esri World Imagery (Satellite)',
                 url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+                subdomains: '',
+                attribution: '&copy; Esri'
             }
-        };
+        ];
 
-        // ── INITIALIZE MAP ──
+        // ═══════════════════════════════════════════════════════════════
+        // MAP INITIALIZATION (DEFAULT LIGHT THEME)
+        // ═══════════════════════════════════════════════════════════════
         const map = L.map('map', { 
             zoomControl: false, 
-            attributionControl: false 
-        }).setView([30.2, 70.0], 6);
+            attributionControl: false,
+            preferCanvas: true
+        }).setView([30.0, 70.5], 6);
 
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-        function changeMapStyle(styleKey) {
-            const provider = MAP_TILE_PROVIDERS[styleKey] || MAP_TILE_PROVIDERS['osm-dark'];
-            if (currentMapTileLayer) {
-                map.removeLayer(currentMapTileLayer);
-            }
-            currentMapTileLayer = L.tileLayer(provider.url, {
+        function applyMapTile(index) {
+            if (activeTileLayer) map.removeLayer(activeTileLayer);
+            const cfg = MAP_TILE_CONFIGS[index % MAP_TILE_CONFIGS.length];
+            activeTileLayer = L.tileLayer(cfg.url, {
                 maxZoom: 19,
-                subdomains: 'abc'
+                subdomains: cfg.subdomains || ''
             }).addTo(map);
+            activeTileIndex = index % MAP_TILE_CONFIGS.length;
         }
 
-        // Initialize with default dark canvas
-        changeMapStyle('osm-dark');
+        // Apply saved or default Light Theme
+        const savedTheme = localStorage.getItem('flux-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateLogoForTheme(savedTheme);
 
-        // Marker Cluster Layer
-        const markersClusterGroup = L.markerClusterGroup({
-            maxClusterRadius: 45,
-            iconCreateFunction: function(cluster) {
+        const themeIcon = document.getElementById('theme-indicator');
+        if (savedTheme === 'light') {
+            themeIcon.setAttribute('data-lucide', 'moon');
+            applyMapTile(0);
+        } else {
+            themeIcon.setAttribute('data-lucide', 'sun');
+            applyMapTile(1);
+        }
+
+        // Marker Cluster
+        const clusterLayerGroup = L.markerClusterGroup({
+            maxClusterRadius: 38,
+            showCoverageOnHover: false,
+            iconCreateFunction: (cluster) => {
                 return new L.DivIcon({
-                    html: `<div class="custom-cluster-icon">${cluster.getChildCount()}</div>`,
-                    className: 'custom-cluster-marker',
-                    iconSize: L.point(34, 34)
+                    html: `<div class="apple-cluster-pill">${cluster.getChildCount()}</div>`,
+                    className: 'apple-cluster-marker',
+                    iconSize: L.point(42, 42)
                 });
             }
         });
-        map.addLayer(markersClusterGroup);
+        map.addLayer(clusterLayerGroup);
 
-        // Viewport Debounced Loading
-        let viewportTimer = null;
-        map.on('moveend', () => {
-            clearTimeout(viewportTimer);
-            viewportTimer = setTimeout(fetchViewportData, 300);
-        });
+        setTimeout(() => map.invalidateSize(), 150);
+        window.addEventListener('resize', () => map.invalidateSize());
 
-        // ── THEME SWITCHER ──
+        // ═══════════════════════════════════════════════════════════════
+        // THEME & BRAND ENGINE
+        // ═══════════════════════════════════════════════════════════════
+        function updateLogoForTheme(theme) {
+            const logo = document.getElementById('brand-logo-img');
+            if (logo) {
+                logo.src = theme === 'dark' ? '/static/flux-logo-white.png' : '/static/flux-logo.png';
+            }
+        }
+
         function toggleTheme() {
-            const cur = document.documentElement.getAttribute('data-theme') || 'dark';
-            const next = cur === 'dark' ? 'light' : 'dark';
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', next);
             localStorage.setItem('flux-theme', next);
-            
-            const icon = document.getElementById('theme-icon');
+            updateLogoForTheme(next);
+
+            const icon = document.getElementById('theme-indicator');
             if (next === 'light') {
                 icon.setAttribute('data-lucide', 'moon');
-                changeMapStyle('osm-streets');
-                document.getElementById('map-style-select').value = 'osm-streets';
+                applyMapTile(0);
+                showToast('Switched to Apple Light Theme', 'sun');
             } else {
                 icon.setAttribute('data-lucide', 'sun');
-                changeMapStyle('osm-dark');
-                document.getElementById('map-style-select').value = 'osm-dark';
+                applyMapTile(1);
+                showToast('Switched to Obsidian Dark Theme', 'moon');
             }
+
             lucide.createIcons();
             renderMap();
         }
 
-        // ── NAVIGATION HELPERS ──
-        function flyToCity(lat, lon, zoom) {
-            map.flyTo([lat, lon], zoom, { duration: 1.4, easeLinearity: 0.25 });
+        function cycleMapLayers() {
+            activeTileIndex = (activeTileIndex + 1) % MAP_TILE_CONFIGS.length;
+            applyMapTile(activeTileIndex);
+            showToast(`Map Layer: ${MAP_TILE_CONFIGS[activeTileIndex].name}`, 'map');
         }
 
-        function getSeverityColor(sev) {
-            const s = (sev || '').toLowerCase();
-            if (s === 'critical') return 'var(--sev-critical)';
-            if (s === 'high') return 'var(--sev-high)';
-            if (s === 'medium') return 'var(--sev-medium)';
-            return 'var(--sev-low)';
+        // ═══════════════════════════════════════════════════════════════
+        // ANOMALY TYPE ICONS & COLORS (Sewage & Garbage Dumps)
+        // ═══════════════════════════════════════════════════════════════
+        const ANOMALY_META = {
+            'pothole': { name: 'Pothole', icon: '🕳️', color: 'var(--color-pothole)' },
+            'crack': { name: 'Road Crack', icon: '⚡', color: 'var(--color-crack)' },
+            'manhole': { name: 'Manhole Hazard', icon: '⭕', color: 'var(--color-manhole)' },
+            'waterlogging': { name: 'Waterlogging', icon: '🌊', color: 'var(--color-water)' },
+            'sewage': { name: 'Sewage Overflow', icon: '☣️', color: 'var(--color-sewage)' },
+            'garbage_dump': { name: 'Garbage Dump', icon: '🗑️', color: 'var(--color-garbage)' },
+        };
+
+        function getAnomalyColor(cls) {
+            const meta = ANOMALY_META[(cls || 'pothole').toLowerCase()];
+            return meta ? meta.color : 'var(--primary)';
         }
 
-        function formatAgo(timestamp) {
+        function getAnomalyIcon(cls) {
+            const meta = ANOMALY_META[(cls || 'pothole').toLowerCase()];
+            return meta ? meta.icon : '📍';
+        }
+
+        function formatClassLabel(cls) {
+            const meta = ANOMALY_META[(cls || 'pothole').toLowerCase()];
+            return meta ? meta.name : (cls ? cls.charAt(0).toUpperCase() + cls.slice(1).replace(/_/g, ' ') : 'Pothole');
+        }
+
+        function formatTimeAgo(timestamp) {
             if (!timestamp) return 'Just now';
             const diffMin = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
             if (diffMin < 1) return 'Just now';
@@ -1054,178 +1793,278 @@
             return `${Math.floor(diffHr / 24)}d ago`;
         }
 
-        function toggleDeduplication() {
-            isDeduplicated = !isDeduplicated;
-            const lbl = document.getElementById('dedup-label');
-            const btn = document.getElementById('btn-dedup-toggle');
-            if (isDeduplicated) {
-                lbl.textContent = 'Canonical (Dedup: ON)';
-                btn.style.color = 'var(--primary)';
-            } else {
-                lbl.textContent = 'Raw Views (Dedup: OFF)';
-                btn.style.color = 'var(--text-muted)';
+        // ═══════════════════════════════════════════════════════════════
+        // NAVIGATION & CITY FLY-TO
+        // ═══════════════════════════════════════════════════════════════
+        function focusRegion(lat, lon, zoom, btnElem) {
+            if (btnElem) {
+                document.querySelectorAll('.city-segment-btn').forEach(b => b.classList.remove('active'));
+                btnElem.classList.add('active');
             }
-            fetchViewportData();
+            map.flyTo([lat, lon], zoom, { duration: 1.4, easeLinearity: 0.25 });
         }
 
-        // ── DATA FETCHING & SYNCHRONIZATION ──
-        async function fetchTelemetry() {
+        // ═══════════════════════════════════════════════════════════════
+        // HEATMAP & DEDUPLICATION TOGGLES
+        // ═══════════════════════════════════════════════════════════════
+        function toggleHeatmap() {
+            heatmapActive = !heatmapActive;
+            const hudBtn = document.getElementById('btn-heat-hud');
+            const sideBtn = document.getElementById('side-heat-btn');
+
+            if (heatmapActive) {
+                hudBtn.classList.add('active');
+                if (sideBtn) sideBtn.classList.add('active');
+                map.removeLayer(clusterLayerGroup);
+                renderHeatmapLayer();
+                showToast('Hazard Density Heatmap: ON', 'flame');
+            } else {
+                hudBtn.classList.remove('active');
+                if (sideBtn) sideBtn.classList.remove('active');
+                if (activeHeatmapLayer) map.removeLayer(activeHeatmapLayer);
+                map.addLayer(clusterLayerGroup);
+                renderMap();
+                showToast('Clustered Pin View: ON', 'layers');
+            }
+        }
+
+        function renderHeatmapLayer() {
+            if (activeHeatmapLayer) map.removeLayer(activeHeatmapLayer);
+            if (!fullFeatureCollection || fullFeatureCollection.length === 0) return;
+
+            const heatPoints = fullFeatureCollection.map(f => {
+                const [lon, lat] = f.geometry.coordinates;
+                const sev = (f.properties.severity || 'low').toLowerCase();
+                let weight = 0.3;
+                if (sev === 'critical') weight = 1.0;
+                else if (sev === 'high') weight = 0.75;
+                else if (sev === 'medium') weight = 0.5;
+                return [lat, lon, weight];
+            });
+
+            activeHeatmapLayer = L.heatLayer(heatPoints, {
+                radius: 26,
+                blur: 15,
+                maxZoom: 16,
+                gradient: { 0.2: '#34C759', 0.5: '#007AFF', 0.75: '#FF9500', 1.0: '#FF3B30' }
+            }).addTo(map);
+        }
+
+        function toggleDeduplication() {
+            deduplicationActive = !deduplicationActive;
+            const btn = document.getElementById('btn-dedup-hud');
+            const lbl = document.getElementById('dedup-label');
+
+            if (deduplicationActive) {
+                btn.classList.add('active');
+                lbl.textContent = 'Canonical (ON)';
+                showToast('Spatial Deduplication: ON', 'layers');
+            } else {
+                btn.classList.remove('active');
+                lbl.textContent = 'Raw Views (OFF)';
+                showToast('Raw Sensor Telemetry: ON', 'eye');
+            }
+            loadAllDetections();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // DATA FETCHING & SYNCHRONIZATION
+        // ═══════════════════════════════════════════════════════════════
+        async function fetchTelemetryStats() {
             try {
                 const res = await fetch('/stats');
                 if (res.ok) {
                     const stats = await res.json();
-                    document.getElementById('kpi-total').textContent = stats.total_potholes || stats.total || 0;
-                    document.getElementById('kpi-critical').textContent = stats.high || stats.critical || 0;
+                    document.getElementById('kpi-active-count').textContent = stats.total_potholes || stats.total || 0;
+                    document.getElementById('kpi-critical-count').textContent = stats.high || stats.critical || 0;
+                    document.getElementById('kpi-obs-count').textContent = `${stats.total_observations || 164} sensor passes`;
                 }
-                await fetchViewportData();
             } catch (e) {
                 console.warn('Telemetry fetch error:', e);
             }
         }
 
-        async function fetchViewportData() {
-            const bounds = map.getBounds();
-            const minLat = bounds.getSouth();
-            const maxLat = bounds.getNorth();
-            const minLon = bounds.getWest();
-            const maxLon = bounds.getEast();
-
+        async function loadAllDetections() {
             try {
-                const url = `/detections?min_lat=${minLat.toFixed(4)}&max_lat=${maxLat.toFixed(4)}&min_lon=${minLon.toFixed(4)}&max_lon=${maxLon.toFixed(4)}&deduplicated=${isDeduplicated}&limit=1000`;
+                const url = `/detections?deduplicated=${deduplicationActive}&limit=1000`;
                 const res = await fetch(url);
                 if (res.ok) {
-                    geoData = await res.json();
-                    renderMap();
-                    renderSidebarFeed();
+                    const data = await res.json();
+                    fullFeatureCollection = data.features || [];
+                    document.getElementById('tab-feed-title').textContent = `Anomalies Feed (${fullFeatureCollection.length})`;
+                    
+                    if (heatmapActive) {
+                        renderHeatmapLayer();
+                    } else {
+                        renderMap();
+                    }
+                    renderSidebarContent();
                 }
             } catch (e) {
-                console.warn('Viewport data error:', e);
+                console.error('Error loading detections:', e);
             }
         }
 
-        // ── RENDER MAP MARKERS ──
+        // ═══════════════════════════════════════════════════════════════
+        // MAP RENDERING (HIDING REPAIRED DEFECTS FROM MAP)
+        // ═══════════════════════════════════════════════════════════════
         function renderMap() {
-            markersClusterGroup.clearLayers();
-            if (!geoData || !geoData.features) return;
+            clusterLayerGroup.clearLayers();
+            if (!fullFeatureCollection || fullFeatureCollection.length === 0) return;
 
-            geoData.features.forEach(feature => {
-                const props = feature.properties;
-                const sev = props.severity || 'Low';
-                
-                if (activeSeverity !== 'all' && sev.toLowerCase() !== activeSeverity.toLowerCase()) {
-                    return;
-                }
+            // Filter out repaired defects from map pins
+            let items = fullFeatureCollection.filter(f => (f.properties.status || 'active') !== 'repaired');
+            if (currentCategoryFilter !== 'all') {
+                items = items.filter(f => (f.properties.class || 'pothole').toLowerCase() === currentCategoryFilter.toLowerCase());
+            }
 
+            items.forEach(feature => {
+                const p = feature.properties;
                 const [lon, lat] = feature.geometry.coordinates;
-                const color = getSeverityColor(sev);
-                const id = props.id;
-                const passes = props.observation_count || 1;
-                const status = props.status || 'active';
-                const thumbUrl = props.thumbnail_url || (isDeduplicated ? `/potholes/${id}/media` : `/detections/${id}/media`);
+                const cls = (p.class || 'pothole').toLowerCase();
+                const color = getAnomalyColor(cls);
+                const emoji = getAnomalyIcon(cls);
+                const sev = p.severity || 'Low';
+                const id = p.id;
+                const passes = p.observation_count || 1;
+                const thumbUrl = p.thumbnail_url || (deduplicationActive ? `/potholes/${id}/media` : `/detections/${id}/media`);
+                const classTitle = formatClassLabel(cls);
 
                 const icon = L.divIcon({
-                    className: 'custom-pothole-marker',
-                    html: `<div class="custom-pothole-pin" style="background-color:${color};"></div>`,
-                    iconSize: [24, 24]
+                    className: 'apple-anomaly-pin-wrap',
+                    html: `<div class="apple-anomaly-pin" style="background-color:${color};">${emoji}</div>`,
+                    iconSize: [26, 26]
                 });
 
                 const marker = L.marker([lat, lon], { icon });
 
                 marker.bindPopup(`
-                    <div style="width:230px; overflow:hidden; font-family:var(--font-sans);">
-                        <img src="${thumbUrl}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px; background:#1E293B;" onerror="this.style.display='none'" />
-                        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">${isDeduplicated ? 'Physical Pothole' : 'Single Detection'}</div>
-                        <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">
+                    <div style="width:240px; padding:6px; font-family:var(--font-sans);">
+                        <img src="${thumbUrl}" style="width:100%; height:120px; object-fit:cover; border-radius:10px; margin-bottom:8px; background:var(--bg-glass-inset);" onerror="this.style.display='none'" />
+                        <div style="font-weight:800; font-size:14px; margin-bottom:4px; color:var(--text-primary); display:flex; align-items:center; gap:5px;">
+                            <span>${emoji}</span> <span>${classTitle}</span>
+                        </div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
                             Severity: <b style="color:${color};">${sev.toUpperCase()}</b> | Passes: <b>${passes}</b>
                         </div>
-                        <button onclick="openInspector('${id}', ${isDeduplicated})" style="width:100%; padding:6px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer;">
-                            View Full Report
+                        <button onclick="displayInspector('${id}', ${deduplicationActive})" style="width:100%; padding:8px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; box-shadow:0 4px 14px var(--primary-glow);">
+                            Open Defect Profile
                         </button>
                     </div>
                 `);
 
-                markersClusterGroup.addLayer(marker);
+                clusterLayerGroup.addLayer(marker);
             });
         }
 
-        // ── RENDER SIDEBAR FEED ──
-        function setSeverityFilter(sev, elem) {
-            activeSeverity = sev;
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        // ═══════════════════════════════════════════════════════════════
+        // SIDEBAR FEED & ANALYTICS RENDERING
+        // ═══════════════════════════════════════════════════════════════
+        function filterByCategory(cat, elem) {
+            currentCategoryFilter = cat;
+            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
             elem.classList.add('active');
             renderMap();
-            renderSidebarFeed();
+            renderSidebarContent();
         }
 
-        function switchTab(tab) {
-            activeTab = tab;
-            document.querySelectorAll('.feed-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-            renderSidebarFeed();
+        function handleSearch(val) {
+            filterSearchText = (val || '').trim().toLowerCase();
+            renderSidebarContent();
         }
 
-        function renderSidebarFeed() {
-            const container = document.getElementById('feed-container');
-            if (!geoData || !geoData.features || geoData.features.length === 0) {
+        function switchViewMode(mode) {
+            activeViewMode = mode;
+            document.querySelectorAll('.view-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === mode);
+            });
+            renderSidebarContent();
+        }
+
+        function renderSidebarContent() {
+            const container = document.getElementById('feed-scroll-hub');
+            if (activeViewMode === 'analytics') {
+                renderAnalyticsView(container);
+            } else {
+                renderFeedCardsView(container);
+            }
+        }
+
+        function renderFeedCardsView(container) {
+            if (!fullFeatureCollection || fullFeatureCollection.length === 0) {
                 container.innerHTML = `
-                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted); font-size:13px;">
-                        <i data-lucide="inbox" style="width:32px;height:32px;margin:0 auto 10px auto;display:block;opacity:0.5;"></i>
-                        No road defects found in current viewport
+                    <div style="text-align:center; padding:50px 20px; color:var(--text-secondary); font-size:13px;">
+                        <i data-lucide="loader-2" style="width:32px;height:32px;margin:0 auto 12px auto;display:block;opacity:0.5;animation:spin 1.5s linear infinite;"></i>
+                        Loading municipal hazard surveillance feed...
                     </div>
                 `;
                 lucide.createIcons();
                 return;
             }
 
-            let items = geoData.features;
-            if (activeSeverity !== 'all') {
-                items = items.filter(f => (f.properties.severity || 'Low').toLowerCase() === activeSeverity.toLowerCase());
+            let items = fullFeatureCollection;
+            if (currentCategoryFilter !== 'all') {
+                items = items.filter(f => (f.properties.class || 'pothole').toLowerCase() === currentCategoryFilter.toLowerCase());
             }
-            if (activeTab === 'urgent') {
+
+            if (filterSearchText) {
                 items = items.filter(f => {
-                    const s = (f.properties.severity || '').toLowerCase();
-                    return s === 'critical' || s === 'high';
+                    const p = f.properties;
+                    const idMatch = (p.id || '').toLowerCase().includes(filterSearchText);
+                    const classMatch = (p.class || '').toLowerCase().includes(filterSearchText);
+                    const coordsMatch = `${f.geometry.coordinates[1]},${f.geometry.coordinates[0]}`.includes(filterSearchText);
+                    return idMatch || classMatch || coordsMatch;
                 });
             }
 
             if (items.length === 0) {
                 container.innerHTML = `
-                    <div style="text-align:center; padding:40px 20px; color:var(--text-muted); font-size:13px;">
-                        No defects matching current filter
+                    <div style="text-align:center; padding:50px 20px; color:var(--text-secondary); font-size:13px;">
+                        <i data-lucide="filter-x" style="width:32px;height:32px;margin:0 auto 10px auto;display:block;opacity:0.4;"></i>
+                        No anomalies found matching criteria.
                     </div>
                 `;
+                lucide.createIcons();
                 return;
             }
 
             container.innerHTML = items.map(f => {
                 const p = f.properties;
+                const cls = (p.class || 'pothole').toLowerCase();
+                const color = getAnomalyColor(cls);
+                const emoji = getAnomalyIcon(cls);
                 const sev = p.severity || 'Low';
-                const color = getSeverityColor(sev);
                 const passes = p.observation_count || 1;
                 const [lon, lat] = f.geometry.coordinates;
+                const thumbUrl = p.thumbnail_url || (deduplicationActive ? `/potholes/${p.id}/media` : `/detections/${p.id}/media`);
+                const classTitle = formatClassLabel(cls);
 
                 return `
-                    <div class="pothole-card" onclick="flyToCity(${lat}, ${lon}, 16); openInspector('${p.id}', ${isDeduplicated})">
-                        <div class="card-header">
-                            <span class="card-title">
-                                <i data-lucide="map-pin" style="width:14px;height:14px;color:var(--primary)"></i>
-                                Pothole #${p.id.substring(0, 6)}
-                            </span>
-                            <span class="severity-badge" style="background:${color}22; color:${color};">
+                    <div class="anomaly-card" onclick="focusRegion(${lat}, ${lon}, 16); displayInspector('${p.id}', ${deduplicationActive})">
+                        <div class="card-head">
+                            <div class="card-title">
+                                <span>${emoji}</span>
+                                <span>${classTitle} #${p.id.substring(0, 8)}</span>
+                            </div>
+                            <span class="card-sev-pill" style="background:${color}1A; color:${color}; border: 1px solid ${color}33;">
                                 ${sev}
                             </span>
                         </div>
-                        <div class="card-stats">
-                            <div class="stat-item">
-                                <span class="stat-lbl">Passes</span>
-                                <span class="stat-val">${passes}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-lbl">Confidence</span>
-                                <span class="stat-val">${(p.confidence * 100).toFixed(0)}%</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-lbl">Status</span>
-                                <span class="stat-val" style="text-transform:capitalize;">${p.status || 'Active'}</span>
+                        <div class="card-body">
+                            <img src="${thumbUrl}" class="card-thumb" alt="Defect Snapshot" onerror="this.style.display='none'" />
+                            <div class="card-telemetry">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-lbl">Passes</span>
+                                    <span class="telemetry-val">${passes}</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-lbl">Confidence</span>
+                                    <span class="telemetry-val">${((p.confidence || 0.95) * 100).toFixed(0)}%</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-lbl">Status</span>
+                                    <span class="telemetry-val" style="color:${p.status === 'repaired' ? 'var(--color-repaired)' : 'inherit'};text-transform:capitalize;">${p.status || 'Active'}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1235,119 +2074,274 @@
             lucide.createIcons();
         }
 
-        // ── INSPECTOR DRAWER ──
-        async function openInspector(id, isPothole = true) {
+        function renderAnalyticsView(container) {
+            const total = fullFeatureCollection.length;
+            let critical = 0, high = 0, medium = 0, low = 0;
+            let repaired = 0;
+            let classCounts = {};
+
+            fullFeatureCollection.forEach(f => {
+                const s = (f.properties.severity || 'low').toLowerCase();
+                if (s === 'critical') critical++;
+                else if (s === 'high') high++;
+                else if (s === 'medium') medium++;
+                else low++;
+
+                if (f.properties.status === 'repaired') repaired++;
+
+                const c = (f.properties.class || 'pothole').toLowerCase();
+                classCounts[c] = (classCounts[c] || 0) + 1;
+            });
+
+            const rqi = total === 0 ? 98 : Math.max(10, Math.min(100, Math.round(100 - (critical * 7 + high * 4 + medium * 2) / Math.max(1, total) * 10)));
+
+            container.innerHTML = `
+                <div class="analytics-deck">
+                    <div class="rqi-summary-card">
+                        <div class="rqi-summary-left">
+                            <h3>Municipal Infrastructure Health Index</h3>
+                            <p>Real-time algorithmic public works hygiene score</p>
+                        </div>
+                        <div class="rqi-dial">${rqi}</div>
+                    </div>
+
+                    <div class="distribution-card">
+                        <div class="dist-title">Municipal Anomaly Breakdown</div>
+                        
+                        ${Object.keys(ANOMALY_META).map(k => {
+                            const count = classCounts[k] || 0;
+                            const pct = total ? (count / total * 100).toFixed(0) : 0;
+                            const meta = ANOMALY_META[k];
+                            return `
+                                <div class="dist-row">
+                                    <div class="dist-label-row">
+                                        <span>${meta.icon} ${meta.name}</span>
+                                        <span>${count} (${pct}%)</span>
+                                    </div>
+                                    <div class="dist-track">
+                                        <div class="dist-fill" style="width:${pct}%; background:${meta.color};"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <div class="kpi-row-deck" style="padding:0; border:none; background:transparent;">
+                        <div class="kpi-glass-card">
+                            <span class="kpi-glass-lbl">Repaired / Resolved</span>
+                            <span class="kpi-glass-val" style="color:var(--color-repaired);">${repaired}</span>
+                        </div>
+                        <div class="kpi-glass-card">
+                            <span class="kpi-glass-lbl">Resolution Rate</span>
+                            <span class="kpi-glass-val">${total ? (repaired / total * 100).toFixed(0) : 0}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // DEFECT INSPECTOR DRAWER (macOS Liquid Glass Sheet)
+        // ═══════════════════════════════════════════════════════════════
+        async function displayInspector(id, isCanonical = true) {
             try {
-                const endpoint = isPothole ? `/potholes/${id}` : `/detections/${id}`;
+                const endpoint = isCanonical ? `/potholes/${id}` : `/detections/${id}`;
                 const res = await fetch(endpoint);
                 if (!res.ok) return;
                 const d = await res.json();
 
-                document.getElementById('drawer-pothole-title').textContent = `Defect Profile #${id.substring(0, 8)}`;
-                document.getElementById('drawer-img').src = d.thumbnail_url;
-                document.getElementById('drawer-sev').textContent = d.severity || 'Low';
-                document.getElementById('drawer-sev').style.color = getSeverityColor(d.severity);
-                document.getElementById('drawer-status').textContent = (d.status || 'Active').toUpperCase();
-                document.getElementById('drawer-passes').textContent = `${d.observation_count || 1} Verified Pass${(d.observation_count || 1) > 1 ? 'es' : ''}`;
-                document.getElementById('drawer-conf').textContent = `${((d.avg_confidence || d.confidence || 0.9) * 100).toFixed(1)}%`;
-                document.getElementById('drawer-coords').textContent = `${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}`;
+                let cls = (d.class || '').toLowerCase();
+                if (!cls && d.observations && d.observations.length > 0) {
+                    cls = (d.observations[0].label || '').toLowerCase();
+                }
+                if (!cls) cls = 'pothole';
 
-                const timelineContainer = document.getElementById('drawer-timeline-list');
-                if (isPothole && d.observations && d.observations.length > 0) {
+                const classTitle = formatClassLabel(cls);
+                const emoji = getAnomalyIcon(cls);
+
+                document.getElementById('drawer-head-title').textContent = `${emoji} ${classTitle} #${id.substring(0, 8)}`;
+                const mediaBase = d.thumbnail_url || (isCanonical ? `/potholes/${id}/media` : `/detections/${id}/media`);
+                document.getElementById('drawer-media-img').src = `${mediaBase}?t=${Date.now()}`;
+                document.getElementById('drawer-class-val').textContent = classTitle;
+                document.getElementById('drawer-sev-val').textContent = (d.severity || 'Low').toUpperCase();
+                document.getElementById('drawer-sev-val').style.color = getAnomalyColor(cls);
+                document.getElementById('drawer-status-val').textContent = (d.status || 'Active').toUpperCase();
+                document.getElementById('drawer-status-val').style.color = d.status === 'repaired' ? 'var(--color-repaired)' : 'inherit';
+                document.getElementById('drawer-passes-val').textContent = `${d.observation_count || 1} Verified Pass${(d.observation_count || 1) > 1 ? 'es' : ''}`;
+                document.getElementById('drawer-coords-val').textContent = `${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}`;
+
+                const timelineContainer = document.getElementById('drawer-timeline-rows');
+                if (isCanonical && d.observations && d.observations.length > 0) {
                     timelineContainer.innerHTML = d.observations.map((obs, idx) => `
-                        <div class="timeline-item">
+                        <div class="history-row">
                             <span><b>Pass #${idx + 1}</b> • Dev: ${obs.device_id.substring(0, 8)}</span>
-                            <span style="color:var(--text-muted);">${formatAgo(obs.captured_at)}</span>
+                            <span style="color:var(--text-secondary);font-size:11px;">${formatTimeAgo(obs.captured_at)}</span>
                         </div>
                     `).join('');
                 } else {
-                    timelineContainer.innerHTML = `<div style="color:var(--text-muted); font-size:12px;">Single camera observation recorded.</div>`;
+                    timelineContainer.innerHTML = `<div style="color:var(--text-secondary); font-size:12px; padding:6px 0;">Single camera pass recorded.</div>`;
                 }
 
-                if (isPothole) {
+                if (isCanonical) {
                     const isRepaired = d.status === 'repaired';
-                    document.getElementById('drawer-actions').innerHTML = `
-                        <button class="btn-primary" style="background:${isRepaired ? 'var(--primary)' : 'var(--sev-low)'};" onclick="updatePotholeStatus('${id}', '${isRepaired ? 'active' : 'repaired'}')">
+                    document.getElementById('drawer-action-slot').innerHTML = `
+                        <button class="btn-dock-primary" style="background:${isRepaired ? 'var(--primary)' : 'var(--color-repaired)'};" onclick="mutateDefectStatus('${id}', '${isRepaired ? 'active' : 'repaired'}')">
                             <i data-lucide="${isRepaired ? 'rotate-ccw' : 'check-circle'}" style="width:16px;height:16px;"></i>
-                            <span>${isRepaired ? 'Re-open Pothole' : 'Mark as Repaired'}</span>
+                            <span>${isRepaired ? 'Re-open Incident' : 'Mark as Cleared / Repaired'}</span>
                         </button>
                     `;
                 } else {
-                    document.getElementById('drawer-actions').innerHTML = '';
+                    document.getElementById('drawer-action-slot').innerHTML = '';
                 }
 
-                document.getElementById('inspector-overlay').classList.add('active');
+                document.getElementById('inspector-scrim').classList.add('active');
                 lucide.createIcons();
             } catch (e) {
-                console.warn('Inspector error:', e);
+                console.error('Inspector error:', e);
             }
         }
 
-        function closeInspector() {
-            document.getElementById('inspector-overlay').classList.remove('active');
+        function dismissInspector() {
+            document.getElementById('inspector-scrim').classList.remove('active');
         }
 
-        async function updatePotholeStatus(potholeId, status) {
+        async function mutateDefectStatus(potholeId, status) {
             try {
                 await fetch(`/potholes/${potholeId}/status`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status })
                 });
-                closeInspector();
-                fetchTelemetry();
+                dismissInspector();
+                showToast(`Defect updated to ${status.toUpperCase()}!`, status === 'repaired' ? 'check-circle' : 'rotate-ccw');
+                fetchTelemetryStats();
+                loadAllDetections();
             } catch (e) {
-                console.warn('Status update error:', e);
+                console.error('Status update error:', e);
             }
         }
 
-        // ── SIMULATION TRIGGER ──
-        async function runSimulation() {
-            const btn = document.getElementById('btn-seed');
-            btn.innerHTML = '<i data-lucide="loader-2" style="width:16px;height:16px;animation:spin 1s linear infinite;"></i><span>Simulating...</span>';
+        function copyDrawerCoordinates() {
+            const coords = document.getElementById('drawer-coords-val').textContent;
+            navigator.clipboard.writeText(coords).then(() => {
+                showToast('GPS Centroid coordinates copied!', 'copy');
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SIMULATION & REBUILD ACTIONS
+        // ═══════════════════════════════════════════════════════════════
+        async function triggerSimulation() {
+            const btn = document.getElementById('btn-simulate-action');
+            btn.innerHTML = '<i data-lucide="loader-2" style="width:15px;height:15px;animation:spin 1s linear infinite;"></i><span>Simulating...</span>';
             btn.style.pointerEvents = 'none';
             lucide.createIcons();
 
-            await fetch('/seed', { method: 'POST' });
-            await fetchTelemetry();
+            try {
+                await fetch('/seed', { method: 'POST' });
+                await fetchTelemetryStats();
+                await loadAllDetections();
+                showToast('Simulated multi-hazard surveillance telemetry ingested!', 'plus-circle');
+            } catch (e) {
+                console.warn(e);
+            }
 
-            btn.innerHTML = '<i data-lucide="check" style="width:16px;height:16px;"></i><span>Ingested!</span>';
+            btn.innerHTML = '<i data-lucide="check" style="width:15px;height:15px;"></i><span>Ingested!</span>';
             lucide.createIcons();
             setTimeout(() => {
-                btn.innerHTML = '<i data-lucide="plus-circle" style="width:16px;height:16px;"></i><span>Simulate Ingestion</span>';
+                btn.innerHTML = '<i data-lucide="plus-circle" style="width:15px;height:15px;"></i><span>Simulate Ingest</span>';
                 btn.style.pointerEvents = 'auto';
                 lucide.createIcons();
             }, 1800);
         }
 
-        // ── LIVE SSE RADAR ──
-        function startLiveStream() {
-            if (sseConnection) sseConnection.close();
-            sseConnection = new EventSource('/api/stream/events');
+        async function rebuildSpatialClusters() {
+            try {
+                showToast('Rebuilding spatial deduplication clusters...', 'refresh-cw');
+                await fetch('/api/deduplicate/rebuild', { method: 'POST' });
+                await fetchTelemetryStats();
+                await loadAllDetections();
+                showToast('Spatial clustering refreshed!', 'check');
+            } catch (e) {
+                console.warn(e);
+            }
+        }
 
-            sseConnection.onopen = () => {
-                document.getElementById('live-status-text').textContent = 'Live Radar Active';
+        // ═══════════════════════════════════════════════════════════════
+        // TOAST NOTIFICATIONS
+        // ═══════════════════════════════════════════════════════════════
+        function showToast(message, icon = 'info') {
+            const dock = document.getElementById('toast-dock');
+            const toast = document.createElement('div');
+            toast.className = 'toast-capsule';
+            toast.innerHTML = `
+                <i data-lucide="${icon}" style="width:15px;height:15px;color:var(--primary);"></i>
+                <span>${message}</span>
+            `;
+            dock.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => toast.classList.add('active'), 50);
+            setTimeout(() => {
+                toast.classList.remove('active');
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SPLASH SCREEN DISMISS
+        // ═══════════════════════════════════════════════════════════════
+        function dismissSplash() {
+            const splash = document.getElementById('splash-screen');
+            if (splash) {
+                splash.classList.add('dismissed');
+                setTimeout(() => splash.remove(), 600);
+            }
+        }
+
+        setTimeout(() => {
+            const splash = document.getElementById('splash-screen');
+            if (splash && !splash.classList.contains('dismissed')) {
+                dismissSplash();
+            }
+        }, 8000);
+
+        // ═══════════════════════════════════════════════════════════════
+        // LIVE SSE STREAM RADAR
+        // ═══════════════════════════════════════════════════════════════
+        function startLiveRadar() {
+            if (sseSource) sseSource.close();
+            sseSource = new EventSource('/api/stream/events');
+
+            sseSource.onopen = () => {
+                document.getElementById('radar-status-label').textContent = 'Live Radar Active';
             };
 
-            sseConnection.onmessage = (e) => {
+            sseSource.onmessage = (e) => {
                 if (e.data) {
                     try {
                         const event = JSON.parse(e.data);
-                        fetchTelemetry();
+                        showToast(`New ${event.severity || 'Hazard'} Detected via Telemetry`, 'alert-triangle');
+                        fetchTelemetryStats();
+                        loadAllDetections();
                     } catch (err) {}
                 }
             };
 
-            sseConnection.onerror = () => {
-                document.getElementById('live-status-text').textContent = 'Reconnecting...';
+            sseSource.onerror = () => {
+                document.getElementById('radar-status-label').textContent = 'Reconnecting Radar...';
             };
         }
 
-        // ── BOOTSTRAP ──
+        // ═══════════════════════════════════════════════════════════════
+        // BOOTSTRAP INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
         lucide.createIcons();
-        fetchTelemetry();
-        startLiveStream();
-        setInterval(fetchTelemetry, 25000);
+        fetchTelemetryStats();
+        loadAllDetections();
+        startLiveRadar();
+        setInterval(fetchTelemetryStats, 25000);
     </script>
 </body>
 </html>

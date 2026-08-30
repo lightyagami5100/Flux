@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,7 +17,7 @@ from app.db import get_session
 
 @pytest.fixture
 def mock_detection_events():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ev1 = DetectionEvent(
         event_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
         device_id="cam-01",
@@ -94,6 +94,8 @@ def test_client_with_db(mock_detection_events):
     mock_settings.minio_bucket = "media"
     mock_settings.minio_secure = False
     mock_settings.ingest_stream = "stream:detections"
+    mock_settings.is_production = False
+    mock_settings.missing_production_settings.return_value = []
 
     mock_redis = AsyncMock()
 

@@ -2,10 +2,13 @@ repo_map:
   app/main.py: [app, get_all_detections, get_potholes, get_pothole_detail, get_pothole_media, update_pothole_status, rebuild_clusters, export_geojson, get_detection_detail, get_detection_media, sse_events, get_stats, get_notifications, seed_data, create_upload_session, upload_chunk, complete_upload, cancel_upload, ingest_detection, upload_and_ingest, healthz, livez, readyz, prometheus_metrics]
   app/models.py: [Base, DetectionStatus, PotholeStatus, CanonicalPothole, DetectionEvent]
   app/deduplication.py: [haversine_distance, compute_event_severity, compute_event_confidence, escalate_severity, cluster_detection, recluster_all_events, DEFAULT_DEDUP_RADIUS_METERS]
+  app/config.py: [Settings, get_settings, is_production, missing_production_settings]
+  app/processors/roboflow.py: [RoboflowProcessor, CircuitBreakerOpen, ProcessorUnavailable, MediaUndecodable]
+  app/processors/base.py: [BaseProcessor, PermanentProcessingError, Detection, ProcessingResult, MediaType]
   app/metrics.py: [metrics, MetricsRegistry, PrometheusMiddleware]
   app/schemas.py: [DetectionEventIn, DetectionAccepted, UploadSessionRequest, UploadSessionResponse, ChunkUploadResponse, CompleteUploadResponse]
   app/upload_manager.py: [UploadManager, UploadSession, DEFAULT_CHUNK_SIZE, STALE_SESSION_TTL]
-  app/worker.py: [DetectionWorker, main]
+  app/worker.py: [DetectionWorker, MediaUnavailable, main]
   static/index.html: [LeafletMap, ClusterGroup, SSELiveRadar, ViewportLoader, InspectModal, GeoJSONExport, DedupToggle, StatusUpdater]
   tests/test_main.py: [test_healthz, test_ingest_detection]
   tests/test_processor.py: [test_processor_creation, test_roboflow_processor, test_roboflow_circuit_breaker]
@@ -14,17 +17,23 @@ repo_map:
   tests/test_visualization.py: [TestVisualizationAPI]
   tests/test_deduplication.py: [test_haversine_distance_zero, test_haversine_distance_small, test_escalate_severity, TestSpatialClusteringEngine, TestPotholeEndpointsAPI]
   tests/test_health_and_metrics.py: [TestHealthProbes, TestPrometheusMetrics]
-active_bugs: {}
-completed_milestones: [MS-001, MS-002, MS-003, MS-004, MS-005, MS-006, MS-007, MS-008, MS-009]
+  tests/test_config_guard.py: [test_development_defaults_are_allowed_outside_production, test_production_rejects_the_placeholder_coco_model, test_fully_configured_production_reports_no_problems, test_production_rejects_default_database_credentials, test_production_rejects_empty_api_keys, test_production_rejects_minioadmin_credentials, test_production_rejects_missing_roboflow_key_when_processor_selected]
+  tests/test_worker.py: [TestMediaFetch, TestHandleDelivery]
+  tests/test_video_sampling.py: [TestVideoSampling, TestUndecodableMedia]
+active_bugs:
+  BUG-001: ["yolov8n.pt (6.5MB local weights) still tracked in git; violates external-only inference rule", yolov8n.pt, awaiting-human-approval-to-delete]
+  BUG-002: ["app/database.py is a dead duplicate Base+models with hardcoded creds, zero importers", app/database.py, awaiting-human-approval-to-delete]
+completed_milestones: [MS-003, MS-004, MS-005, MS-006, MS-007, MS-008, MS-009, MS-010, MS-011]
 assumptions:
   - "DETECTION_TARGET: 'potholes'"
   - "MAP_MARKER_MEANING: 'one marker per canonical pothole entity (deduplicated across multi-pass recordings)'"
   - "DEDUP_RADIUS: '10.0 meters Great-Circle Haversine'"
-  - "VIDEO_SOURCE: 'volunteer mobile app chunking'"
-  - "SCALE: 'continuous background chunked uploads'"
-  - "MOBILE_TECH: 'React Native (Expo)'"
-  - "CHUNK_SIZE: '5 MB default'"
+  - "SCALE: 'continuous background chunked uploads from React Native (Expo), 5 MB chunks'"
   - "UPLOAD_FLOW: 'session → chunks → complete → ingest → worker infer → real-time spatial dedup clustering'"
   - "VISUALIZATION: 'Leaflet + clustering + in-popup snapshots + SSE radar + bbox queries + repair lifecycle'"
   - "OBSERVABILITY: 'Prometheus metrics (/metrics), health probes (/healthz, /livez, /readyz)'"
-next_action: "All milestones complete and verified with 50/50 tests passing. System is ready for live production demo."
+  - "AUTO_CREATE_TABLES: 'stays true in production - no migration tool exists in the repo yet'"
+  - "PROD_GUARD: 'ENVIRONMENT != development/dev/test/local makes dev-default credentials a hard startup failure'"
+  - "POSTGIS: 'postgis/postgis image is unnecessary - clustering is Haversine in Python, no PostGIS types used'"
+  - "VIDEO_SAMPLING: 'fixed stride (every 15th frame, max 20) - no motion/bump gating, so smooth road still costs 20 API calls'"
+next_action: "Human decision on BUG-001 / BUG-002 deletions; then set ROBOFLOW_MODEL_ID to a real pothole model (coco/3 detects no potholes)."

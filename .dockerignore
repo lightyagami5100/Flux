@@ -1,0 +1,39 @@
+# Keep the build context small and free of secrets/artifacts.
+.git
+.gitignore
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+
+# Secrets — never bake into an image.
+.env
+.env.*
+!.env.example
+
+# Local databases and dev artifacts
+*.db
+*.sqlite3
+
+# Local model weights: inference is remote only.
+*.pt
+*.onnx
+*.weights
+
+# Mobile app is built and shipped separately.
+mobile/
+
+# Tooling / agent state
+.qoder/
+.agents/
+.claude/
+STATE.yaml
+
+# Docs and CI
+README.md
+AGENTS.md
+tests/
+requirements-dev.txt

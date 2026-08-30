@@ -12,12 +12,20 @@ from typing import Any, ClassVar
 logger = logging.getLogger(__name__)
 
 
+class PermanentProcessingError(Exception):
+    """The input can never succeed on retry, e.g. media that will not decode.
+
+    Callers should route these straight to the dead-letter queue instead of
+    spending the retry budget on them.
+    """
+
+
 class MediaType(str, Enum):
     IMAGE = "image"
     VIDEO = "video"
 
     @classmethod
-    def from_value(cls, value: str) -> "MediaType":
+    def from_value(cls, value: str) -> MediaType:
         try:
             return cls(value.strip().lower())
         except ValueError as exc:

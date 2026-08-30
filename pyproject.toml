@@ -1,0 +1,45 @@
+[project]
+name = "flux"
+version = "0.1.0"
+description = "Flux Road Intelligence Platform — video ingest, external CV inference, spatial pothole deduplication"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = [
+    ".venv",
+    "mobile",
+    "static",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# Conservative gate: correctness and unused-code rules only, so the lint step
+# referenced by .qoder/rules/Flux-sys.md is actionable rather than noisy.
+select = [
+    "E4",   # import formatting
+    "E7",
+    "E9",   # syntax / runtime errors
+    "F",    # pyflakes: undefined names, unused imports
+    "B",    # flake8-bugbear: likely bugs
+    "UP",   # pyupgrade
+]
+ignore = [
+    "B008",   # FastAPI uses function calls (Depends/Query) in argument defaults by design
+    "UP042",  # str+Enum is intentional: values must serialise as plain strings
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests install sys.modules stubs before importing the app, so imports cannot all
+# sit at the top of the file.
+"tests/*" = ["E402", "F401", "F811"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]

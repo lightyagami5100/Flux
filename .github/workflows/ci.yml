@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Lint & test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 matches the Dockerfile. Keep it as the source of truth.
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ruff
+        run: ruff check app tests
+
+      - name: Pytest
+        env:
+          ENVIRONMENT: test
+        run: pytest -q
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: flux-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  compose:
+    name: Compose files validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate development stack
+        run: docker compose -f infra/docker-compose.yml config >/dev/null
+
+      - name: Validate production stack
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: flux
+          MINIO_ACCESS_KEY: ci-access
+          MINIO_SECRET_KEY: ci-secret
+          ROBOFLOW_API_KEY: ci-roboflow-key
+          ROBOFLOW_MODEL_ID: ci-model/1
+          API_KEYS: '{"ci-key": "ci-device"}'
+        run: docker compose -f infra/docker-compose.prod.yml config >/dev/null
+
+  secrets:
+    name: No committed secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject a committed .env
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked by git. Remove it and rotate the credentials."
+            exit 1
+          fi
+      - name: Reject local model weights
+        run: |
+          if git ls-files '*.pt' '*.onnx' '*.weights' | grep .; then
+            echo "::error::Local model weights are committed. Inference is remote-only."
+            exit 1
+          fi

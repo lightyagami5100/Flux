@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import sys
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -23,7 +23,7 @@ client = TestClient(app)
 def test_healthz():
     with patch("app.main.aioredis.from_url") as mock_from_url, \
          patch("app.main.get_settings") as mock_get_settings, \
-         patch("app.main.UploadManager") as mock_upload_mgr:
+         patch("app.main.UploadManager"):
         mock_settings = MagicMock()
         mock_settings.auto_create_tables = False
         mock_settings.minio_endpoint = "localhost:9000"
@@ -32,6 +32,8 @@ def test_healthz():
         mock_settings.minio_bucket = "media"
         mock_settings.minio_secure = False
         mock_settings.ingest_stream = "stream:detections"
+        mock_settings.is_production = False
+        mock_settings.missing_production_settings.return_value = []
         mock_get_settings.return_value = mock_settings
         mock_from_url.return_value = AsyncMock()
         with TestClient(app) as client:
@@ -53,7 +55,7 @@ def test_ingest_detection(mock_get_redis, mock_store, mock_reserve):
     payload = {
         "schema_version": 1,
         "event_id": event_id,
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "captured_at": datetime.now(UTC).isoformat(),
         "media": {
             "kind": "image",
             "uri": "minio://bucket/test.jpg"
@@ -76,7 +78,7 @@ def test_ingest_detection(mock_get_redis, mock_store, mock_reserve):
 
     with patch("app.main.aioredis.from_url") as mock_from_url, \
          patch("app.main.get_settings") as mock_get_settings, \
-         patch("app.main.UploadManager") as mock_upload_mgr:
+         patch("app.main.UploadManager"):
         mock_settings = MagicMock()
         mock_settings.auto_create_tables = False
         mock_settings.max_body_bytes = 10000000
@@ -86,6 +88,8 @@ def test_ingest_detection(mock_get_redis, mock_store, mock_reserve):
         mock_settings.minio_bucket = "media"
         mock_settings.minio_secure = False
         mock_settings.ingest_stream = "stream:detections"
+        mock_settings.is_production = False
+        mock_settings.missing_production_settings.return_value = []
         mock_get_settings.return_value = mock_settings
         mock_from_url.return_value = mock_redis
         with TestClient(app) as client:

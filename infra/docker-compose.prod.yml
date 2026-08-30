@@ -1,25 +1,60 @@
-version: "3.9"
+# Production stack. Every credential is a required environment variable:
+# compose fails fast with a named error instead of booting on a default.
+# Provide them via ./.env at the repo root or the deploy environment.
+x-app: &app
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  environment:
+    ENVIRONMENT: production
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    REDIS_URL: redis://redis:6379/0
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+    MINIO_SECURE: "false"
+    MINIO_BUCKET: ${MINIO_BUCKET:-media}
+    PROCESSOR_NAME: ${PROCESSOR_NAME:-roboflow}
+    ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:?ROBOFLOW_API_KEY is required}
+    # coco/3 has no pothole class, so it is rejected by the startup guard.
+    ROBOFLOW_MODEL_ID: ${ROBOFLOW_MODEL_ID:?ROBOFLOW_MODEL_ID is required (e.g. my-pothole-project/4)}
+    VIDEO_SAMPLE_EVERY_N_FRAMES: ${VIDEO_SAMPLE_EVERY_N_FRAMES:-15}
+    VIDEO_MAX_FRAMES: ${VIDEO_MAX_FRAMES:-20}
+    API_KEYS: ${API_KEYS:?API_KEYS is required (JSON map of api_key -> device_id)}
+    # No migration tool in the repo yet: the schema is created from ORM metadata
+    # on boot. Switch to false once migrations land.
+    AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+  restart: unless-stopped
+  logging: &logging
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "3"
 
 services:
   db:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: flux_user
-      POSTGRES_PASSWORD: flux_password
-      POSTGRES_DB: flux_db
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flux_user -d flux_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+    logging: *logging
 
   redis:
     image: redis:7-alpine
@@ -32,18 +67,14 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+    logging: *logging
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
     volumes:
       - miniodata:/data
     healthcheck:
@@ -52,71 +83,17 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
+    logging: *logging
 
   api:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    # Port 8000 is not exposed publicly, only to internal nginx network
+    <<: *app
+    # Not published: nginx is the only public entrypoint.
     expose:
       - "8000"
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql+asyncpg://flux_user:flux_password@db:5432/flux_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_SECURE=False
-      - ROBOFLOW_API_KEY=${ROBOFLOW_API_KEY:-""}
-      - PROCESSOR_NAME=roboflow
-      - AUTO_CREATE_TABLES=True
-      - API_KEYS=${API_KEYS:-"{}"}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
 
   worker:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    <<: *app
     command: ["python", "-m", "app.worker"]
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql+asyncpg://flux_user:flux_password@db:5432/flux_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_SECURE=False
-      - ROBOFLOW_API_KEY=${ROBOFLOW_API_KEY:-""}
-      - PROCESSOR_NAME=roboflow
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
 
   nginx:
     image: nginx:alpine
@@ -126,8 +103,10 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ../static:/usr/share/nginx/html:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
+    logging: *logging
 
 volumes:
   pgdata:

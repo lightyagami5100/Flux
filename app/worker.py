@@ -19,21 +19,20 @@ Scale out:  docker compose up --scale worker=4  (each replica gets a unique
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
-import random
 import signal
 import socket
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import redis.asyncio as aioredis
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .config import Settings, get_settings
 from .db import SessionLocal
@@ -42,6 +41,7 @@ from .schemas import DetectionEventIn, MediaRef
 
 from .media_store import MediaStore
 from .processors import create_processor, MediaType
+from .processors.base import PermanentProcessingError
 from .deduplication import cluster_detection
 
 logger = logging.getLogger("worker")
@@ -59,8 +59,17 @@ def _consumer_name() -> str:
     return f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:6]}"
 
 
+class MediaUnavailable(Exception):
+    """The referenced media object could not be fetched from the object store."""
+
+
 class DetectionWorker:
-    def __init__(self, redis_client: Redis, session_factory, settings: Settings) -> None:
+    def __init__(
+        self,
+        redis_client: Redis,
+        session_factory: async_sessionmaker[AsyncSession],
+        settings: Settings,
+    ) -> None:
         self.redis = redis_client
         self.session_factory = session_factory
         self.settings = settings
@@ -83,7 +92,8 @@ class DetectionWorker:
             "worker starting consumer=%s stream=%s group=%s",
             self.consumer, self.settings.ingest_stream, self.settings.ingest_consumer_group,
         )
-        # Load heavy ML weights synchronously but in threadpool
+        # The processor talks to an external inference API; this only builds the
+        # client and validates credentials.
         await asyncio.to_thread(self.processor.load)
         
         await self._ensure_group()
@@ -189,6 +199,14 @@ class DetectionWorker:
             metrics, detected_objects = await self.process_media(event.media)
             processing_ms = int((time.perf_counter() - started) * 1000)
             await self._persist_success(event, device_id, received_at, metrics, detected_objects, processing_ms)
+        except PermanentProcessingError as exc:
+            # Retrying undecodable input can never succeed; don't burn the budget.
+            logger.error("event=%s is permanently unprocessable: %s", event.event_id, exc)
+            await self._persist_failure(event, device_id, received_at, exc)
+            await self._to_dlq(message_id, raw, exc, attempts)
+            await self._ack(message_id)
+            await self.redis.delete(attempts_key)
+            return
         except Exception as exc:
             logger.exception(
                 "processing failed for event=%s (attempt %d/%d)",
@@ -222,7 +240,7 @@ class DetectionWorker:
                 "data": raw,
                 "error": f"{type(exc).__name__}: {exc}"[:2000],
                 "attempts": str(attempts),
-                "failed_at": datetime.now(timezone.utc).isoformat(),
+                "failed_at": datetime.now(UTC).isoformat(),
             },
             maxlen=self.settings.stream_maxlen,
             approximate=True,
@@ -234,16 +252,14 @@ class DetectionWorker:
         started = time.perf_counter()
         
         object_key = media.uri.replace(f"minio://{self.settings.minio_bucket}/", "")
-        
+
         try:
             media_bytes = await asyncio.to_thread(self.store.download, object_key)
         except Exception as e:
-            logger.warning(f"Failed to download {object_key}, simulating an empty image for testing. Error: {e}")
-            import numpy as np
-            import cv2
-            blank_image = np.zeros((640, 640, 3), np.uint8)
-            _, encoded_image = cv2.imencode('.jpg', blank_image)
-            media_bytes = encoded_image.tobytes()
+            # Never fabricate input. A synthetic frame would be billed by the
+            # inference API and then persisted as a successful zero-detection
+            # result, which is indistinguishable from "this road is fine".
+            raise MediaUnavailable(f"could not download {object_key}: {e}") from e
 
         download_ms = int((time.perf_counter() - started) * 1000)
 
@@ -283,7 +299,7 @@ class DetectionWorker:
         detected_objects: list[dict],
         processing_ms: int,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         final_objects = detected_objects if detected_objects else [o.model_dump() for o in event.objects]
         object_count = len(final_objects)
         
@@ -359,7 +375,7 @@ class DetectionWorker:
     ) -> None:
         """Best-effort audit row; never mask the DLQ path."""
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 pg_insert(DetectionEvent)
                 .values(

@@ -1,10 +1,9 @@
 # Multi-stage production build for Flux Vision Ingestion Platform
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir inference-sdk
 
 FROM python:3.11-slim
 
@@ -25,7 +24,8 @@ USER appuser
 COPY --chown=appuser:appuser . .
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    ENVIRONMENT=production
 
 EXPOSE 8000
 

@@ -4,6 +4,16 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
+# Local runs are always development: keeps the Redis/SQLite fallbacks enabled
+# and stops app/config.py from demanding production credentials.
+export ENVIRONMENT="${ENVIRONMENT:-development}"
+
+if [ ! -x "$DIR/.venv/bin/python" ]; then
+    echo "❌ .venv not found. Create it first:"
+    echo "   python -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt"
+    exit 1
+fi
+
 echo "============================================================"
 echo "           🚀 FLUX ROAD INTELLIGENCE PLATFORM               "
 echo "============================================================"
@@ -20,11 +30,14 @@ EOF
 echo "📱 Mobile configuration updated -> http://$IP_ADDR:8000"
 
 # 3. Start Docker Containers if Docker is available
+COMPOSE_ARGS=(-f infra/docker-compose.yml)
+# Compose resolves .env relative to the compose file, so point it at the repo root.
+[ -f "$DIR/.env" ] && COMPOSE_ARGS=(--env-file "$DIR/.env" "${COMPOSE_ARGS[@]}")
 if command -v docker >/dev/null 2>&1; then
     echo "🐳 Checking background containers (Postgres, Redis, MinIO)..."
-    docker compose -f infra/docker-compose.yml up db redis minio -d 2>/dev/null || \
-    sudo -n docker compose -f infra/docker-compose.yml up db redis minio -d 2>/dev/null || \
-    echo "ℹ️  Docker daemon in user mode or not running — utilizing instant high-speed fallback engine."
+    docker compose "${COMPOSE_ARGS[@]}" up db redis minio -d 2>/dev/null || \
+    sudo -n docker compose "${COMPOSE_ARGS[@]}" up db redis minio -d 2>/dev/null || \
+    echo "ℹ️  Docker unavailable — falling back to in-process Redis and local SQLite."
 fi
 
 # 4. Background Seeder to populate map if empty after server starts

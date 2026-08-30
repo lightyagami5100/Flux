@@ -71,6 +71,7 @@ mobile/web-build/
 .idea/
 .vscode/
 .qoder/
+.agents/
 *.swp
 *.swo
 *~
@@ -80,3 +81,13 @@ Thumbs.db
 # Logs & temporary files
 *.log
 scratch/
+
+# Local model weights. CV inference is remote-only (Roboflow / Alibaba API);
+# nothing in this repo should load weights from disk.
+*.pt
+*.pth
+*.onnx
+*.weights
+
+# Lint cache
+.ruff_cache/
