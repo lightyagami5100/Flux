@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .config import Settings, get_settings
 from .db import SessionLocal
-from .models import DetectionEvent, DetectionStatus
+from .models import CanonicalPothole, DetectionEvent, DetectionStatus
 from .schemas import DetectionEventIn, MediaRef
 
 from .media_store import MediaStore
@@ -48,6 +48,7 @@ logger = logging.getLogger("worker")
 
 BATCH_SIZE = 32
 BLOCK_MS = 5_000            # XREADGROUP long-poll
+LIVE_CHANNEL = "flux:events:live"  # Redis Pub/Sub channel for real-time SSE fan-out
 RECLAIM_INTERVAL_S = 60     # how often we sweep for abandoned pending messages
 MIN_IDLE_MS = 300_000       # pending > 5 min => previous owner is presumed dead
                             # (must exceed your worst-case per-message processing time)
@@ -362,9 +363,45 @@ class DetectionWorker:
                         processing_ms=processing_ms,
                     )
                     try:
-                        await cluster_detection(session, persisted_event)
+                        canonical, _is_new = await cluster_detection(session, persisted_event)
                     except Exception as e:
                         logger.warning("Failed to cluster event %s: %s", event.event_id, e)
+                        canonical = None
+
+                    # Publish to Redis Pub/Sub for instant SSE fan-out
+                    if canonical is not None:
+                        await self._publish_live(canonical, event, final_objects)
+
+    async def _publish_live(
+        self,
+        canonical: CanonicalPothole,
+        event: DetectionEventIn,
+        detected_objects: list[dict],
+    ) -> None:
+        """Best-effort publish to Redis Pub/Sub so SSE clients get instant updates."""
+        try:
+            is_new = canonical.observation_count == 1
+            # Determine the primary class label from detected objects
+            label = "pothole"
+            if detected_objects:
+                label = detected_objects[0].get("label", "pothole")
+            payload = {
+                "type": "pothole.created" if is_new else "pothole.updated",
+                "id": str(canonical.pothole_id),
+                "latitude": canonical.latitude,
+                "longitude": canonical.longitude,
+                "severity": canonical.severity,
+                "observation_count": canonical.observation_count,
+                "avg_confidence": round(canonical.avg_confidence, 3),
+                "timestamp": (canonical.last_detected_at or event.captured_at).isoformat(),
+                "thumbnail_url": f"/potholes/{canonical.pothole_id}/media",
+                "class": label,
+                "device_id": event.device_id or "unknown",
+            }
+            await self.redis.publish(LIVE_CHANNEL, json.dumps(payload))
+            logger.debug("published live event for canonical=%s", canonical.pothole_id)
+        except Exception:
+            logger.debug("failed to publish live event (non-critical)", exc_info=True)
 
     async def _persist_failure(
         self,

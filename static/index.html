@@ -399,6 +399,62 @@
             100% { transform: scale(0.9); opacity: 0.8; }
         }
 
+        /* ═══════════════════════════════════════════════════════════════
+           LIVE DETECTION SONAR PULSE — expanding triple-ring on new events
+           ═══════════════════════════════════════════════════════════════ */
+        .live-sonar-ring {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        .live-sonar-ring::before,
+        .live-sonar-ring::after,
+        .live-sonar-ring .sonar-core {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .live-sonar-ring::before {
+            border: 2.5px solid var(--color-sonar, #FF3B30);
+            animation: sonar-expand 2s ease-out infinite;
+        }
+
+        .live-sonar-ring::after {
+            border: 2px solid var(--color-sonar, #FF3B30);
+            animation: sonar-expand 2s 0.4s ease-out infinite;
+        }
+
+        .live-sonar-ring .sonar-core {
+            border: 1.5px solid var(--color-sonar, #FF3B30);
+            animation: sonar-expand 2s 0.8s ease-out infinite;
+        }
+
+        @keyframes sonar-expand {
+            0% { width: 16px; height: 16px; opacity: 0.9; }
+            100% { width: 90px; height: 90px; opacity: 0; }
+        }
+
+        /* Animated KPI counter transition */
+        .kpi-glass-value {
+            transition: transform 0.3s var(--ease-spring);
+        }
+        .kpi-glass-value.counting {
+            transform: scale(1.15);
+        }
+
+        /* Enhanced toast with severity-colored left border */
+        .toast-capsule.severity-critical { border-left: 3px solid #FF3B30; }
+        .toast-capsule.severity-high { border-left: 3px solid #FF9500; }
+        .toast-capsule.severity-medium { border-left: 3px solid #FFCC00; }
+        .toast-capsule.severity-low { border-left: 3px solid #34C759; }
+
         /* Segmented City Capsule */
         .city-capsule-strip {
             display: flex;
@@ -2614,8 +2670,87 @@
         }, 8000);
 
         // ═══════════════════════════════════════════════════════════════
-        // LIVE SSE STREAM RADAR
+        // LIVE SSE STREAM RADAR (Enhanced with sonar pulse + animated stats)
         // ═══════════════════════════════════════════════════════════════
+        let liveEventCount = 0;
+
+        function animateCounter(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const oldText = el.textContent;
+            const oldVal = parseInt(oldText) || 0;
+            if (oldVal === newValue) return;
+            el.classList.add('counting');
+            // Smooth number counting animation
+            const duration = 600;
+            const startTime = performance.now();
+            function step(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+                el.textContent = Math.round(oldVal + (newValue - oldVal) * eased);
+                if (progress < 1) requestAnimationFrame(step);
+                else el.classList.remove('counting');
+            }
+            requestAnimationFrame(step);
+        }
+
+        function spawnSonarAtLatLng(lat, lng, severity) {
+            const point = map.latLngToContainerPoint([lat, lng]);
+            const ring = document.createElement('div');
+            ring.className = 'live-sonar-ring';
+            ring.innerHTML = '<div class="sonar-core"></div>';
+            // Map severity to color
+            const sevColors = { critical: '#FF3B30', high: '#FF9500', medium: '#FFCC00', low: '#34C759' };
+            const color = sevColors[(severity || 'medium').toLowerCase()] || '#FF3B30';
+            ring.style.cssText = `--color-sonar: ${color}; left: ${point.x}px; top: ${point.y}px;`;
+            document.getElementById('map').appendChild(ring);
+            setTimeout(() => ring.remove(), 8000);
+        }
+
+        function handleLiveEvent(event) {
+            liveEventCount++;
+
+            // Severity-colored toast
+            const sev = (event.severity || 'Medium').toLowerCase();
+            const sevLabel = event.severity || 'Hazard';
+            const classLabel = (event.class || 'pothole').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const isNew = event.type === 'pothole.created';
+            const action = isNew ? '🚨 New' : '🔄 Updated';
+            const toastMsg = `${action} ${classLabel} — Severity: ${sevLabel.toUpperCase()}`;
+            showToast(toastMsg, isNew ? 'alert-triangle' : 'refresh-cw');
+
+            // Add severity class to the latest toast
+            const dock = document.getElementById('toast-dock');
+            if (dock && dock.lastElementChild) {
+                dock.lastElementChild.classList.add(`severity-${sev}`);
+            }
+
+            // Sonar pulse on map at detection location
+            if (event.latitude && event.longitude) {
+                spawnSonarAtLatLng(event.latitude, event.longitude, event.severity);
+            }
+
+            // Refresh data and animate counters
+            fetchTelemetryStats().then(() => {
+                // Animate the KPI values after fresh data arrives
+                const activeEl = document.getElementById('kpi-active-count');
+                const critEl = document.getElementById('kpi-critical-count');
+                if (activeEl) {
+                    activeEl.classList.add('counting');
+                    setTimeout(() => activeEl.classList.remove('counting'), 400);
+                }
+                if (critEl && (sev === 'critical' || sev === 'high')) {
+                    critEl.classList.add('counting');
+                    setTimeout(() => critEl.classList.remove('counting'), 400);
+                }
+            });
+            loadAllDetections();
+
+            // Update radar label with live event count
+            const radar = document.getElementById('radar-status-label');
+            if (radar) radar.textContent = `Live Radar Active · ${liveEventCount} event${liveEventCount > 1 ? 's' : ''}`;
+        }
+
         function startLiveRadar() {
             if (sseSource) sseSource.close();
             sseSource = new EventSource('/api/stream/events');
@@ -2628,9 +2763,7 @@
                 if (e.data) {
                     try {
                         const event = JSON.parse(e.data);
-                        showToast(`New ${event.severity || 'Hazard'} Detected via Telemetry`, 'alert-triangle');
-                        fetchTelemetryStats();
-                        loadAllDetections();
+                        handleLiveEvent(event);
                     } catch (err) {}
                 }
             };

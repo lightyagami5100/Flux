@@ -1024,16 +1024,44 @@ async def get_detection_media(
 
 @app.get("/api/stream/events", summary="Live SSE stream for real-time canonical & detection events")
 async def sse_events(request: Request):
-    """Server-Sent Events stream for real-time map alerts."""
-    async def event_generator():
+    """Server-Sent Events stream for real-time map alerts.
+
+    Primary path: Redis Pub/Sub subscription (instant delivery from the worker).
+    Fallback: 3-second DB poll (for dev/fakeredis where pub/sub isn't wired).
+    """
+    LIVE_CHANNEL = "flux:events:live"
+
+    async def _pubsub_generator():
+        """Subscribe to Redis Pub/Sub and yield SSE events instantly."""
+        redis: Redis = request.app.state.redis
+        pubsub = redis.pubsub()
+        await pubsub.subscribe(LIVE_CHANNEL)
+        try:
+            yield ": connected (pubsub)\n\n"
+            keepalive_interval = 15  # seconds between keepalive pings
+            while True:
+                if await request.is_disconnected():
+                    break
+                msg = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=keepalive_interval,
+                )
+                if msg and msg["type"] == "message":
+                    yield f"data: {msg['data']}\n\n"
+                else:
+                    yield ": keepalive\n\n"
+        finally:
+            await pubsub.unsubscribe(LIVE_CHANNEL)
+            await pubsub.aclose()
+
+    async def _db_poll_generator():
+        """Fallback: poll the DB every 3 seconds for updated canonical potholes."""
         last_check = datetime.now(UTC)
-        yield ": connected\n\n"
+        yield ": connected (poll)\n\n"
         while True:
             if await request.is_disconnected():
                 break
             try:
                 async with SessionLocal() as session:
-                    # Query newly created/updated canonical potholes
                     stmt = (
                         select(CanonicalPothole)
                         .where(CanonicalPothole.last_detected_at >= last_check)
@@ -1065,6 +1093,23 @@ async def sse_events(request: Request):
                 yield ": keepalive\n\n"
 
             await asyncio.sleep(3)
+
+    # Choose strategy: try pub/sub first, fall back to polling
+    async def event_generator():
+        redis: Redis = request.app.state.redis
+        try:
+            # Probe whether pub/sub is functional (fakeredis doesn't support it)
+            pubsub = redis.pubsub()
+            await pubsub.subscribe(LIVE_CHANNEL)
+            await pubsub.unsubscribe(LIVE_CHANNEL)
+            await pubsub.aclose()
+            use_pubsub = True
+        except Exception:
+            use_pubsub = False
+
+        gen = _pubsub_generator() if use_pubsub else _db_poll_generator()
+        async for chunk in gen:
+            yield chunk
 
     return StreamingResponse(
         event_generator(),
