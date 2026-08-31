@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  ScrollView,
+  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
@@ -48,9 +48,13 @@ export default function VideoUploadScreen() {
 
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Needed', 'Location permission is required for geo-tagging.');
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Location permission not granted; using fallback coordinates.');
+        }
+      } catch (e) {
+        console.warn('Location permission check error:', e);
       }
     })();
     return () => {
@@ -61,7 +65,12 @@ export default function VideoUploadScreen() {
   // ─── Recording ─────────────────────────────────────────────────────
 
   const startRecording = async () => {
-    if (!cameraRef.current) return;
+    if (Platform.OS === 'web' || !cameraRef.current) {
+      // On web or without camera, run the simulated multi-chunk upload
+      await simulateWebVideoUpload();
+      return;
+    }
+
     setIsRecording(true);
     setRecordingDuration(0);
     setProgress({ phase: 'idle', currentChunk: 0, totalChunks: 0, message: 'Recording...' });
@@ -88,7 +97,59 @@ export default function VideoUploadScreen() {
 
   const stopRecording = () => {
     if (cameraRef.current) {
-      cameraRef.current.stopRecording();
+      try {
+        cameraRef.current.stopRecording();
+      } catch (_) {}
+    }
+  };
+
+  // ─── Web Simulation ────────────────────────────────────────────────
+
+  const simulateWebVideoUpload = async () => {
+    try {
+      setProgress({ phase: 'chunking', currentChunk: 0, totalChunks: 2, message: 'Simulating video capture (2 chunks)...' });
+      
+      let lat = 33.6844;
+      let lon = 73.0479;
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (loc?.coords) {
+          lat = loc.coords.latitude;
+          lon = loc.coords.longitude;
+        }
+      } catch (_) {}
+
+      // 1. Create upload session for 2 chunks
+      const session = await createUploadSession({
+        device_id: 'web-volunteer',
+        filename: `patrol_test_${Date.now()}.mp4`,
+        total_chunks: 2,
+        latitude: lat,
+        longitude: lon,
+        content_type: 'video/mp4',
+      });
+
+      // 2. Upload dummy chunks (base64 encoded minimal bytes)
+      const dummyBase64 = btoa('FLUX_VIDEO_TEST_CHUNK_PAYLOAD_DATA_' + Date.now());
+      
+      for (let i = 0; i < 2; i++) {
+        setProgress({ phase: 'uploading', currentChunk: i + 1, totalChunks: 2, message: `Uploading chunk ${i + 1}/2...` });
+        await uploadChunkWithRetry(session.session_id, i, dummyBase64);
+      }
+
+      // 3. Complete
+      setProgress({ phase: 'completing', currentChunk: 2, totalChunks: 2, message: 'Finalizing & queuing for AI...' });
+      const result = await completeUpload(session.session_id);
+
+      setProgress({
+        phase: 'done',
+        currentChunk: 2,
+        totalChunks: 2,
+        message: `✅ Video uploaded! Event ID: ${result.event_id?.substring(0, 8) || 'queued'}`,
+      });
+    } catch (e: any) {
+      console.error('Simulated video upload error:', e);
+      setProgress({ phase: 'error', currentChunk: 0, totalChunks: 0, message: `Upload failed: ${e.message || e}` });
     }
   };
 
@@ -97,8 +158,15 @@ export default function VideoUploadScreen() {
   const handleVideoRecorded = async (videoUri: string) => {
     try {
       // 1. Get GPS location
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const { latitude, longitude } = loc.coords;
+      let latitude = 33.6844;
+      let longitude = 73.0479;
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (loc?.coords) {
+          latitude = loc.coords.latitude;
+          longitude = loc.coords.longitude;
+        }
+      } catch (_) {}
 
       // 2. Get file info
       const fileInfo = await FileSystem.getInfoAsync(videoUri);
@@ -196,13 +264,24 @@ export default function VideoUploadScreen() {
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        // Convert base64 to blob via FormData
         const formData = new FormData();
-        formData.append('chunk', {
-          uri: `data:application/octet-stream;base64,${chunkBase64}`,
-          name: `chunk_${chunkIndex}`,
-          type: 'application/octet-stream',
-        } as any);
+        
+        if (Platform.OS === 'web') {
+          const byteCharacters = atob(chunkBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let b = 0; b < byteCharacters.length; b++) {
+            byteNumbers[b] = byteCharacters.charCodeAt(b);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+          formData.append('chunk', blob, `chunk_${chunkIndex}`);
+        } else {
+          formData.append('chunk', {
+            uri: `data:application/octet-stream;base64,${chunkBase64}`,
+            name: `chunk_${chunkIndex}`,
+            type: 'application/octet-stream',
+          } as any);
+        }
 
         const res = await fetch(
           `${API_BASE}/api/uploads/${sessionId}/chunks/${chunkIndex}`,
@@ -254,71 +333,86 @@ export default function VideoUploadScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────
 
-  if (!permission) return <View />;
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.permissionText}>Camera permission required for video recording.</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   const isUploading = ['chunking', 'uploading', 'completing'].includes(progress.phase);
+
+  const renderContent = () => (
+    <>
+      <View style={styles.overlay}>
+        <Text style={styles.title}>📹 Video Patrol</Text>
+        <Text style={styles.subtitle}>Record & auto-chunk upload</Text>
+
+        {isRecording && (
+          <View style={styles.recordingBadge}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>
+              REC {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Upload Progress */}
+      {progress.phase !== 'idle' && (
+        <View style={styles.progressPanel}>
+          <Text style={[styles.progressMessage, { color: getPhaseColor() }]}>
+            {progress.message}
+          </Text>
+          {isUploading && (
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBar, { width: `${getProgressPercent()}%`, backgroundColor: getPhaseColor() }]} />
+            </View>
+          )}
+          {isUploading && <ActivityIndicator size="small" color={getPhaseColor()} style={{ marginTop: 8 }} />}
+        </View>
+      )}
+
+      {/* Controls */}
+      <View style={styles.buttonContainer}>
+        {!isRecording ? (
+          <TouchableOpacity
+            style={[styles.button, isUploading && styles.buttonDisabled]}
+            onPress={startRecording}
+            disabled={isUploading}
+          >
+            <Text style={styles.buttonText}>
+              {isUploading
+                ? 'Uploading...'
+                : Platform.OS === 'web'
+                ? '📹 Test Chunked Video Upload'
+                : '🔴 Start Recording'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.button, styles.buttonRecording]} onPress={stopRecording}>
+            <Text style={styles.buttonText}>⏹ Stop Recording</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.container}>
-      <CameraView style={styles.camera} facing="back" mode="video" ref={cameraRef}>
-        <View style={styles.overlay}>
-          <Text style={styles.title}>📹 Video Patrol</Text>
-          <Text style={styles.subtitle}>Record & auto-chunk upload</Text>
-
-          {isRecording && (
-            <View style={styles.recordingBadge}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>
-                REC {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Upload Progress */}
-        {progress.phase !== 'idle' && (
-          <View style={styles.progressPanel}>
-            <Text style={[styles.progressMessage, { color: getPhaseColor() }]}>
-              {progress.message}
-            </Text>
-            {isUploading && (
-              <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBar, { width: `${getProgressPercent()}%`, backgroundColor: getPhaseColor() }]} />
-              </View>
-            )}
-            {isUploading && <ActivityIndicator size="small" color={getPhaseColor()} style={{ marginTop: 8 }} />}
-          </View>
-        )}
-
-        {/* Controls */}
-        <View style={styles.buttonContainer}>
-          {!isRecording ? (
-            <TouchableOpacity
-              style={[styles.button, isUploading && styles.buttonDisabled]}
-              onPress={startRecording}
-              disabled={isUploading}
-            >
-              <Text style={styles.buttonText}>
-                {isUploading ? 'Uploading...' : '🔴 Start Recording'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={[styles.button, styles.buttonRecording]} onPress={stopRecording}>
-              <Text style={styles.buttonText}>⏹ Stop Recording</Text>
+      {permission?.granted && Platform.OS !== 'web' ? (
+        <CameraView style={styles.camera} facing="back" mode="video" ref={cameraRef}>
+          {renderContent()}
+        </CameraView>
+      ) : (
+        <View style={[styles.camera, styles.webFallback]}>
+          <Text style={styles.webFallbackTitle}>📹 Video Patrol Standby</Text>
+          <Text style={styles.webFallbackText}>
+            {Platform.OS === 'web'
+              ? 'Web test mode active. You can trigger a multi-chunk upload test below.'
+              : 'Camera permission required for video recording.'}
+          </Text>
+          {!permission?.granted && Platform.OS !== 'web' && (
+            <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+              <Text style={styles.buttonText}>Grant Permission</Text>
             </TouchableOpacity>
           )}
+          {renderContent()}
         </View>
-      </CameraView>
+      )}
     </View>
   );
 }

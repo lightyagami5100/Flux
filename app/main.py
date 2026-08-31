@@ -626,6 +626,9 @@ def render_road_snapshot_svg(
     
     # Custom color themes per anomaly type & severity
     class_color_map = {
+        "debris": "#F59E0B",
+        "road_debris": "#F59E0B",
+        "object": "#F59E0B",
         "pothole": "#EF4444",
         "crack": "#F97316",
         "manhole": "#A855F7",
@@ -636,6 +639,9 @@ def render_road_snapshot_svg(
     box_color = class_color_map.get(cls_lower, "#EF4444")
     
     class_title_map = {
+        "debris": "ROAD DEBRIS",
+        "road_debris": "ROAD DEBRIS",
+        "object": "ROAD OBSTACLE",
         "pothole": "POTHOLE",
         "crack": "ROAD CRACK",
         "manhole": "MANHOLE HAZARD",
@@ -646,7 +652,26 @@ def render_road_snapshot_svg(
     class_title = class_title_map.get(cls_lower, cls_lower.upper().replace("_", " "))
 
     # Generate custom SVG visuals based on anomaly category
-    if cls_lower == "waterlogging":
+    if cls_lower in ("debris", "road_debris", "object"):
+        anomaly_visual = """
+  <!-- Road Debris / Fallen Cargo Obstacle -->
+  <defs>
+    <linearGradient id="debrisGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="60%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#78350F"/>
+    </linearGradient>
+  </defs>
+  <!-- Fallen wooden pallet / debris barrier -->
+  <rect x="180" y="115" width="120" height="60" rx="6" fill="url(#debrisGrad)" filter="url(#shadow)"/>
+  <rect x="190" y="125" width="100" height="12" rx="2" fill="#FEF3C7" opacity="0.4"/>
+  <rect x="190" y="145" width="100" height="12" rx="2" fill="#FEF3C7" opacity="0.3"/>
+  <line x1="210" y1="115" x2="210" y2="175" stroke="#451A03" stroke-width="2.5"/>
+  <line x1="270" y1="115" x2="270" y2="175" stroke="#451A03" stroke-width="2.5"/>
+  <!-- Warning stripes -->
+  <path d="M 230 115 L 245 175" stroke="#FEF08A" stroke-width="3" stroke-dasharray="6,4"/>
+        """
+    elif cls_lower == "waterlogging":
         anomaly_visual = """
   <!-- Waterlogging Flood Pool -->
   <defs>

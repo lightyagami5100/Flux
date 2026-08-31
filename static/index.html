@@ -653,6 +653,187 @@
             gap: 8px;
         }
 
+        /* Multi-Horizon Time Selector */
+        .time-horizon-strip {
+            display: flex;
+            align-items: center;
+            background: var(--bg-glass-inset);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            padding: 3px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--border-subtle);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+            gap: 2px;
+        }
+
+        .time-chip-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 5px 6px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            text-align: center;
+            transition: var(--transition-all);
+            white-space: nowrap;
+        }
+
+        .time-chip-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .time-chip-btn.active {
+            background: var(--bg-glass-elevated);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            color: var(--primary);
+            font-weight: 800;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), var(--border-card-specular);
+            border: 1px solid var(--border-glass);
+        }
+
+        /* Severity Filter Strip */
+        .severity-filter-strip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .severity-filter-strip::-webkit-scrollbar { display: none; }
+
+        .sev-chip-btn {
+            background: var(--bg-glass-card);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--border-card-specular);
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 4px 9px;
+            border-radius: var(--radius-pill);
+            cursor: pointer;
+            transition: var(--transition-all);
+            white-space: nowrap;
+        }
+
+        .sev-chip-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-glass-card-hover);
+            transform: translateY(-1px);
+        }
+
+        .sev-chip-btn.active {
+            font-weight: 800;
+            box-shadow: 0 0 12px var(--primary-glow), var(--border-card-specular);
+        }
+
+        .sev-chip-btn.active[data-sev="all"] {
+            background: var(--primary-bg);
+            color: var(--primary);
+            border-color: var(--primary-border);
+        }
+        .sev-chip-btn.active[data-sev="critical"] {
+            background: var(--color-pothole-bg);
+            color: var(--color-pothole);
+            border-color: rgba(255, 59, 48, 0.4);
+        }
+        .sev-chip-btn.active[data-sev="high"] {
+            background: var(--color-crack-bg);
+            color: var(--color-crack);
+            border-color: rgba(255, 149, 0, 0.4);
+        }
+        .sev-chip-btn.active[data-sev="medium"] {
+            background: var(--color-water-bg);
+            color: var(--color-water);
+            border-color: rgba(0, 122, 255, 0.4);
+        }
+        .sev-chip-btn.active[data-sev="low"] {
+            background: var(--color-repaired-bg);
+            color: var(--color-repaired);
+            border-color: rgba(52, 199, 89, 0.4);
+        }
+
+        /* Threshold Slider Control */
+        .threshold-slider-deck {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            background: var(--bg-glass-inset);
+            backdrop-filter: var(--backdrop-card-blur);
+            -webkit-backdrop-filter: var(--backdrop-card-blur);
+            padding: 8px 12px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .threshold-slider-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .threshold-slider-val {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--primary);
+            background: var(--primary-bg);
+            padding: 1px 6px;
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--primary-border);
+        }
+
+        .liquid-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: var(--radius-pill);
+            background: var(--bg-glass-card);
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition-all);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .liquid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 0 10px var(--primary-glow);
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+
+        .liquid-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .liquid-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 0 10px var(--primary-glow);
+        }
+
         .category-scroll-strip {
             display: flex;
             align-items: center;
@@ -1460,15 +1641,44 @@
                 </div>
             </div>
 
-            <!-- Multi-Anomaly Category Filter Bar -->
+            <!-- Multi-Anomaly Category & Threshold Filter Console -->
             <div class="category-filter-console">
                 <div class="search-liquid-bar">
                     <i data-lucide="search" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
                     <input type="text" id="defect-search-box" placeholder="Search ID, road name, anomaly type..." oninput="handleSearch(this.value)">
                 </div>
 
+                <!-- Multi-Horizon Time Selector -->
+                <div class="time-horizon-strip">
+                    <button class="time-chip-btn active" data-time="all" onclick="filterByTimeHorizon('all', this)">All Time</button>
+                    <button class="time-chip-btn" data-time="10m" onclick="filterByTimeHorizon('10m', this)">10m</button>
+                    <button class="time-chip-btn" data-time="1h" onclick="filterByTimeHorizon('1h', this)">1h</button>
+                    <button class="time-chip-btn" data-time="24h" onclick="filterByTimeHorizon('24h', this)">24h</button>
+                    <button class="time-chip-btn" data-time="7d" onclick="filterByTimeHorizon('7d', this)">7d</button>
+                </div>
+
+                <!-- Severity Selector Strip -->
+                <div class="severity-filter-strip">
+                    <button class="sev-chip-btn active" data-sev="all" onclick="filterBySeverity('all', this)">All</button>
+                    <button class="sev-chip-btn" data-sev="critical" onclick="filterBySeverity('critical', this)">Critical</button>
+                    <button class="sev-chip-btn" data-sev="high" onclick="filterBySeverity('high', this)">High</button>
+                    <button class="sev-chip-btn" data-sev="medium" onclick="filterBySeverity('medium', this)">Med</button>
+                    <button class="sev-chip-btn" data-sev="low" onclick="filterBySeverity('low', this)">Low</button>
+                </div>
+
+                <!-- Confidence Threshold Slider -->
+                <div class="threshold-slider-deck">
+                    <div class="threshold-slider-head">
+                        <span>Confidence Threshold</span>
+                        <span class="threshold-slider-val" id="conf-val-label">≥ 0%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="0" step="5" class="liquid-slider" id="conf-slider" oninput="handleConfidenceChange(this.value)">
+                </div>
+
+                <!-- Category Scroll Strip -->
                 <div class="category-scroll-strip">
-                    <button class="category-chip active" onclick="filterByCategory('all', this)">All (80)</button>
+                    <button class="category-chip active" onclick="filterByCategory('all', this)">All (0)</button>
+                    <button class="category-chip" onclick="filterByCategory('debris', this)">⚠️ Debris</button>
                     <button class="category-chip" onclick="filterByCategory('pothole', this)">🕳️ Potholes</button>
                     <button class="category-chip" onclick="filterByCategory('crack', this)">⚡ Cracks</button>
                     <button class="category-chip" onclick="filterByCategory('manhole', this)">⭕ Manholes</button>
@@ -1632,6 +1842,9 @@
         let fullFeatureCollection = [];
         let activeViewMode = 'feed';
         let currentCategoryFilter = 'all';
+        let currentTimeHorizon = 'all'; // 'all', '10m', '1h', '24h', '7d'
+        let currentSeverityFilter = 'all'; // 'all', 'critical', 'high', 'medium', 'low'
+        let minConfidenceThreshold = 0; // 0 to 100
         let filterSearchText = '';
         let deduplicationActive = true;
         let heatmapActive = false;
@@ -1747,7 +1960,7 @@
             }
 
             lucide.createIcons();
-            renderMap();
+            applyUnifiedFilters();
         }
 
         function cycleMapLayers() {
@@ -1760,6 +1973,9 @@
         // ANOMALY TYPE ICONS & COLORS (Sewage & Garbage Dumps)
         // ═══════════════════════════════════════════════════════════════
         const ANOMALY_META = {
+            'debris': { name: 'Road Debris', icon: '⚠️', color: '#FF9500' },
+            'road_debris': { name: 'Road Debris', icon: '⚠️', color: '#FF9500' },
+            'object': { name: 'Road Obstacle', icon: '📦', color: '#FF9500' },
             'pothole': { name: 'Pothole', icon: '🕳️', color: 'var(--color-pothole)' },
             'crack': { name: 'Road Crack', icon: '⚡', color: 'var(--color-crack)' },
             'manhole': { name: 'Manhole Hazard', icon: '⭕', color: 'var(--color-manhole)' },
@@ -1830,9 +2046,10 @@
 
         function renderHeatmapLayer() {
             if (activeHeatmapLayer) map.removeLayer(activeHeatmapLayer);
-            if (!fullFeatureCollection || fullFeatureCollection.length === 0) return;
+            const filtered = getFilteredFeatures(false);
+            if (!filtered || filtered.length === 0) return;
 
-            const heatPoints = fullFeatureCollection.map(f => {
+            const heatPoints = filtered.map(f => {
                 const [lon, lat] = f.geometry.coordinates;
                 const sev = (f.properties.severity || 'low').toLowerCase();
                 let weight = 0.3;
@@ -1891,14 +2108,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     fullFeatureCollection = data.features || [];
-                    document.getElementById('tab-feed-title').textContent = `Anomalies Feed (${fullFeatureCollection.length})`;
-                    
-                    if (heatmapActive) {
-                        renderHeatmapLayer();
-                    } else {
-                        renderMap();
-                    }
-                    renderSidebarContent();
+                    applyUnifiedFilters();
                 }
             } catch (e) {
                 console.error('Error loading detections:', e);
@@ -1906,17 +2116,146 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
+        // UNIFIED MULTI-DIMENSIONAL FILTERING ENGINE
+        // ═══════════════════════════════════════════════════════════════
+        function filterByTimeHorizon(horizon, elem) {
+            currentTimeHorizon = horizon;
+            document.querySelectorAll('.time-chip-btn').forEach(b => b.classList.remove('active'));
+            if (elem) elem.classList.add('active');
+            applyUnifiedFilters();
+            showToast(`Time Horizon: ${horizon === 'all' ? 'All Time' : 'Past ' + horizon}`, 'clock');
+        }
+
+        function filterBySeverity(sev, elem) {
+            currentSeverityFilter = sev;
+            document.querySelectorAll('.sev-chip-btn').forEach(b => b.classList.remove('active'));
+            if (elem) elem.classList.add('active');
+            applyUnifiedFilters();
+            showToast(`Severity Filter: ${sev === 'all' ? 'All Severities' : sev.toUpperCase()}`, 'alert-triangle');
+        }
+
+        function handleConfidenceChange(val) {
+            minConfidenceThreshold = parseInt(val, 10) || 0;
+            const lbl = document.getElementById('conf-val-label');
+            if (lbl) lbl.textContent = `≥ ${minConfidenceThreshold}%`;
+            applyUnifiedFilters();
+        }
+
+        function filterByCategory(cat, elem) {
+            currentCategoryFilter = cat;
+            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+            if (elem) elem.classList.add('active');
+            applyUnifiedFilters();
+        }
+
+        function handleSearch(val) {
+            filterSearchText = (val || '').trim().toLowerCase();
+            applyUnifiedFilters();
+        }
+
+        function switchViewMode(mode) {
+            activeViewMode = mode;
+            document.querySelectorAll('.view-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === mode);
+            });
+            renderSidebarContent();
+        }
+
+        function getFilteredFeatures(ignoreCategory = false) {
+            if (!fullFeatureCollection || fullFeatureCollection.length === 0) return [];
+            const now = Date.now();
+
+            return fullFeatureCollection.filter(f => {
+                const p = f.properties || {};
+
+                // 1. Time Horizon Filter
+                if (currentTimeHorizon !== 'all') {
+                    const rawTime = p.last_detected_at || p.timestamp || p.first_detected_at;
+                    if (rawTime) {
+                        const itemTime = new Date(rawTime).getTime();
+                        if (!isNaN(itemTime)) {
+                            const diffMs = now - itemTime;
+                            if (currentTimeHorizon === '10m' && diffMs > 10 * 60 * 1000) return false;
+                            if (currentTimeHorizon === '1h' && diffMs > 60 * 60 * 1000) return false;
+                            if (currentTimeHorizon === '24h' && diffMs > 24 * 60 * 60 * 1000) return false;
+                            if (currentTimeHorizon === '7d' && diffMs > 7 * 24 * 60 * 60 * 1000) return false;
+                        }
+                    }
+                }
+
+                // 2. Severity Filter
+                if (currentSeverityFilter !== 'all') {
+                    const sev = (p.severity || 'low').toLowerCase();
+                    if (sev !== currentSeverityFilter.toLowerCase()) return false;
+                }
+
+                // 3. Confidence Threshold Filter
+                const confPercent = Math.round(((p.confidence !== undefined ? p.confidence : 0.85) * 100));
+                if (confPercent < minConfidenceThreshold) return false;
+
+                // 4. Category Filter
+                if (!ignoreCategory && currentCategoryFilter !== 'all') {
+                    const cls = (p.class || 'pothole').toLowerCase();
+                    if (cls !== currentCategoryFilter.toLowerCase()) return false;
+                }
+
+                // 5. Search Text Filter
+                if (filterSearchText) {
+                    const idMatch = (p.id || '').toLowerCase().includes(filterSearchText);
+                    const classMatch = (p.class || '').toLowerCase().includes(filterSearchText);
+                    const coordsMatch = f.geometry && f.geometry.coordinates 
+                        ? `${f.geometry.coordinates[1]},${f.geometry.coordinates[0]}`.includes(filterSearchText)
+                        : false;
+                    if (!idMatch && !classMatch && !coordsMatch) return false;
+                }
+
+                return true;
+            });
+        }
+
+        function applyUnifiedFilters() {
+            updateCategoryCounts();
+            if (heatmapActive) {
+                renderHeatmapLayer();
+            } else {
+                renderMap();
+            }
+            renderSidebarContent();
+        }
+
+        function updateCategoryCounts() {
+            const baseItems = getFilteredFeatures(true);
+            const counts = { all: baseItems.length };
+            baseItems.forEach(f => {
+                const cls = (f.properties.class || 'pothole').toLowerCase();
+                counts[cls] = (counts[cls] || 0) + 1;
+            });
+
+            document.querySelectorAll('.category-chip').forEach(chip => {
+                const onclickAttr = chip.getAttribute('onclick') || '';
+                const match = onclickAttr.match(/filterByCategory\('([^']+)'/);
+                if (match) {
+                    const cat = match[1];
+                    const meta = ANOMALY_META[cat];
+                    const icon = meta ? meta.icon : '📍';
+                    const name = meta ? meta.name : (cat === 'all' ? 'All' : cat);
+                    const c = counts[cat] || 0;
+                    chip.textContent = cat === 'all' ? `All (${c})` : `${icon} ${name} (${c})`;
+                }
+            });
+
+            const filteredCount = getFilteredFeatures(false).length;
+            const tabTitle = document.getElementById('tab-feed-title');
+            if (tabTitle) tabTitle.textContent = `Anomalies Feed (${filteredCount})`;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // MAP RENDERING (HIDING REPAIRED DEFECTS FROM MAP)
         // ═══════════════════════════════════════════════════════════════
         function renderMap() {
             clusterLayerGroup.clearLayers();
-            if (!fullFeatureCollection || fullFeatureCollection.length === 0) return;
-
-            // Filter out repaired defects from map pins
-            let items = fullFeatureCollection.filter(f => (f.properties.status || 'active') !== 'repaired');
-            if (currentCategoryFilter !== 'all') {
-                items = items.filter(f => (f.properties.class || 'pothole').toLowerCase() === currentCategoryFilter.toLowerCase());
-            }
+            const items = getFilteredFeatures(false).filter(f => (f.properties.status || 'active') !== 'repaired');
+            if (!items || items.length === 0) return;
 
             items.forEach(feature => {
                 const p = feature.properties;
@@ -1960,27 +2299,6 @@
         // ═══════════════════════════════════════════════════════════════
         // SIDEBAR FEED & ANALYTICS RENDERING
         // ═══════════════════════════════════════════════════════════════
-        function filterByCategory(cat, elem) {
-            currentCategoryFilter = cat;
-            document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
-            elem.classList.add('active');
-            renderMap();
-            renderSidebarContent();
-        }
-
-        function handleSearch(val) {
-            filterSearchText = (val || '').trim().toLowerCase();
-            renderSidebarContent();
-        }
-
-        function switchViewMode(mode) {
-            activeViewMode = mode;
-            document.querySelectorAll('.view-tab-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.view === mode);
-            });
-            renderSidebarContent();
-        }
-
         function renderSidebarContent() {
             const container = document.getElementById('feed-scroll-hub');
             if (activeViewMode === 'analytics') {
@@ -2002,26 +2320,13 @@
                 return;
             }
 
-            let items = fullFeatureCollection;
-            if (currentCategoryFilter !== 'all') {
-                items = items.filter(f => (f.properties.class || 'pothole').toLowerCase() === currentCategoryFilter.toLowerCase());
-            }
-
-            if (filterSearchText) {
-                items = items.filter(f => {
-                    const p = f.properties;
-                    const idMatch = (p.id || '').toLowerCase().includes(filterSearchText);
-                    const classMatch = (p.class || '').toLowerCase().includes(filterSearchText);
-                    const coordsMatch = `${f.geometry.coordinates[1]},${f.geometry.coordinates[0]}`.includes(filterSearchText);
-                    return idMatch || classMatch || coordsMatch;
-                });
-            }
+            const items = getFilteredFeatures(false);
 
             if (items.length === 0) {
                 container.innerHTML = `
                     <div style="text-align:center; padding:50px 20px; color:var(--text-secondary); font-size:13px;">
                         <i data-lucide="filter-x" style="width:32px;height:32px;margin:0 auto 10px auto;display:block;opacity:0.4;"></i>
-                        No anomalies found matching criteria.
+                        No anomalies match the active time, severity, or threshold criteria.
                     </div>
                 `;
                 lucide.createIcons();
@@ -2075,12 +2380,13 @@
         }
 
         function renderAnalyticsView(container) {
-            const total = fullFeatureCollection.length;
+            const filtered = getFilteredFeatures(false);
+            const total = filtered.length;
             let critical = 0, high = 0, medium = 0, low = 0;
             let repaired = 0;
             let classCounts = {};
 
-            fullFeatureCollection.forEach(f => {
+            filtered.forEach(f => {
                 const s = (f.properties.severity || 'low').toLowerCase();
                 if (s === 'critical') critical++;
                 else if (s === 'high') high++;
@@ -2100,7 +2406,7 @@
                     <div class="rqi-summary-card">
                         <div class="rqi-summary-left">
                             <h3>Municipal Infrastructure Health Index</h3>
-                            <p>Real-time algorithmic public works hygiene score</p>
+                            <p>Real-time algorithmic public works hygiene score (Filtered: ${total})</p>
                         </div>
                         <div class="rqi-dial">${rqi}</div>
                     </div>
