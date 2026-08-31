@@ -172,9 +172,16 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
+# Media upload routes carry raw photo/video chunks (~5 MiB); the JSON body cap
+# would 413 every real capture.
+BODY_SIZE_EXEMPT_PREFIXES = ("/v1/ingest/upload", "/api/uploads")
+
+
 @app.middleware("http")
 async def enforce_body_size(request: Request, call_next):
     """Cheap DoS guard: reject oversized declared bodies before parsing."""
+    if request.url.path.startswith(BODY_SIZE_EXEMPT_PREFIXES):
+        return await call_next(request)
     content_length = request.headers.get("content-length")
     if content_length and content_length.isdigit():
         if int(content_length) > get_settings().max_body_bytes:
@@ -902,7 +909,7 @@ async def update_pothole_status(
 async def rebuild_clusters(session: AsyncSession = Depends(get_session)):
     """Administrative batch sweep to re-cluster historical detection events."""
     count = await recluster_all_events(session)
-    return {"status": "ok", "reوبه": count, "message": f"Successfully processed {count} detection events into canonical clusters"}
+    return {"status": "ok", "reclustered": count, "message": f"Successfully processed {count} detection events into canonical clusters"}
 
 
 @app.get("/detections/export/geojson", summary="Export road anomalies as GeoJSON")

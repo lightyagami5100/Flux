@@ -11,7 +11,7 @@ import math
 import uuid
 from datetime import datetime, UTC
 
-from sqlalchemy import select, func
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CanonicalPothole, DetectionEvent, PotholeStatus
@@ -36,6 +36,12 @@ def _normalize_dt(dt: datetime | None) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt
+
+
+def _dialect_name(session: AsyncSession) -> str:
+    """Best-effort dialect name of the session bind; empty string when undeterminable."""
+    name = getattr(getattr(getattr(session, "bind", None), "dialect", None), "name", "")
+    return name if isinstance(name, str) else ""
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -116,15 +122,14 @@ async def cluster_detection(
     min_lon = event.longitude - lon_delta
     max_lon = event.longitude + lon_delta
 
-    stmt = (
-        select(CanonicalPothole)
-        .where(
-            CanonicalPothole.latitude.between(min_lat, max_lat),
-            CanonicalPothole.longitude.between(min_lon, max_lon),
-            CanonicalPothole.status != PotholeStatus.ARCHIVED,
-        )
-        .with_for_update()
+    stmt = select(CanonicalPothole).where(
+        CanonicalPothole.latitude.between(min_lat, max_lat),
+        CanonicalPothole.longitude.between(min_lon, max_lon),
+        CanonicalPothole.status != PotholeStatus.ARCHIVED,
     )
+    # SELECT ... FOR UPDATE is unsupported on SQLite (the Docker-less fallback).
+    if _dialect_name(session) != "sqlite":
+        stmt = stmt.with_for_update()
 
     result = await session.execute(stmt)
     candidates = result.scalars().all()
@@ -234,8 +239,8 @@ async def recluster_all_events(
     radius_meters: float = DEFAULT_DEDUP_RADIUS_METERS,
 ) -> int:
     """Clear all canonical potholes and recluster all processed detection events from scratch."""
-    # Delete existing canonical potholes
-    await session.execute(select(func.count(CanonicalPothole.pothole_id)))
+    # Delete existing canonical potholes so the rebuild starts from scratch
+    await session.execute(delete(CanonicalPothole))
     # Fetch all processed events ordered chronologically
     stmt = (
         select(DetectionEvent)

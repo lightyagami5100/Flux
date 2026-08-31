@@ -29,9 +29,22 @@ def test_payload_size_limit_enforced(client: TestClient):
         "Content-Length": "10000000",  # 10 MB > max_body_bytes (256 KB)
         "Content-Type": "application/json",
     }
-    response = client.post("/v1/ingest/upload", data=b"{}", headers=oversized_headers)
+    response = client.post("/v1/ingest/detections", data=b"{}", headers=oversized_headers)
     assert response.status_code == 413
     assert response.json()["detail"] == "Payload too large"
+
+
+@pytest.mark.parametrize("path", ["/v1/ingest/upload", "/api/uploads"])
+def test_upload_paths_exempt_from_payload_size_limit(client: TestClient, path: str):
+    """Media upload routes carry multi-MiB chunks and must bypass the 256 KiB body cap."""
+    oversized_headers = {
+        "Content-Length": "10000000",  # 10 MB > max_body_bytes (256 KB)
+        "Content-Type": "application/json",
+    }
+    response = client.post(path, data=b"{}", headers=oversized_headers)
+    assert response.status_code != 413
+    # Request reached the handler, so it fails validation instead of the size guard.
+    assert response.status_code == 422
 
 
 def test_unauthorized_access_rejected(client: TestClient):

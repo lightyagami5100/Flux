@@ -38,7 +38,11 @@
         "ACCESS_BACKGROUND_LOCATION",
         "INTERNET",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -78,9 +82,11 @@
       "reactCompiler": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "8530326e-fd5a-48a6-bf87-81f151c0adc8"
       }
-    }
+    },
+    "owner": "gilanii"
   }
 }

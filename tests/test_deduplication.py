@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.config import Settings
 from app.deduplication import (
@@ -156,6 +157,84 @@ class TestSpatialClusteringEngine:
         assert pytest.approx(pothole.latitude, rel=1e-5) == (33.72000 + 33.72003) / 2
         assert len(pothole.observations) == 2
         assert new_ev.canonical_pothole_id == pothole.pothole_id
+
+
+class TestRebuildAgainstSQLite:
+    """recluster_all_events against a real SQLite bind (the Docker-less fallback)."""
+
+    @pytest.fixture
+    def anyio_backend(self):
+        return "asyncio"
+
+    @staticmethod
+    def _event(lat: float, lon: float, minute: int) -> DetectionEvent:
+        captured = datetime(2026, 8, 25, 10, minute, 0, tzinfo=UTC)
+        return DetectionEvent(
+            event_id=uuid.uuid4(),
+            device_id="mobile_1",
+            captured_at=captured,
+            received_at=captured,
+            status=DetectionStatus.PROCESSED,
+            media_kind="image",
+            media_uri=f"minio://test/{minute}.jpg",
+            latitude=lat,
+            longitude=lon,
+            object_count=1,
+            objects=[{"label": "pothole", "confidence": 0.9, "bbox": [0.1, 0.1, 0.4, 0.4]}],
+            metrics={"severity": "Medium"},
+        )
+
+    @pytest.mark.anyio
+    async def test_rebuild_is_idempotent_and_leaves_no_orphans(self):
+        """Rebuilding twice yields the same canonical rows — no SELECT FOR UPDATE crash,
+        no duplicated or orphaned CanonicalPothole rows."""
+        engine = create_async_engine(
+            "sqlite+aiosqlite:///:memory:", poolclass=StaticPool
+        )
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with session_factory() as session:
+                # Two detections ~3m apart (one cluster) plus one ~200m away.
+                session.add_all([
+                    self._event(33.72000, 73.09000, 0),
+                    self._event(33.72003, 73.09000, 5),
+                    self._event(33.72200, 73.09000, 10),
+                ])
+                await session.commit()
+
+                first_count = await recluster_all_events(session)
+                assert first_count == 3
+
+                ids_after_first = set(
+                    (await session.execute(select(CanonicalPothole.pothole_id))).scalars().all()
+                )
+                assert len(ids_after_first) == 2
+
+                second_count = await recluster_all_events(session)
+                assert second_count == 3
+
+                ids_after_second = set(
+                    (await session.execute(select(CanonicalPothole.pothole_id))).scalars().all()
+                )
+                # Old rows are deleted, not accumulated.
+                assert len(ids_after_second) == 2
+                assert ids_after_first.isdisjoint(ids_after_second)
+
+                # Every event points at a canonical row that still exists.
+                events = (await session.execute(select(DetectionEvent))).scalars().all()
+                assert len(events) == 3
+                for ev in events:
+                    assert ev.canonical_pothole_id in ids_after_second
+
+                total = (
+                    await session.execute(select(CanonicalPothole.observation_count))
+                ).scalars().all()
+                assert sum(total) == 3
+        finally:
+            await engine.dispose()
 
 
 class TestPotholeEndpointsAPI:

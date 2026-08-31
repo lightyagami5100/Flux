@@ -44,6 +44,9 @@ coverage.xml
 
 # Databases & local persistent storage
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 flux_dev.db
