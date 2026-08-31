@@ -24,7 +24,7 @@ repo_map:
   tests/test_video_sampling.py: [TestVideoSampling, TestUndecodableMedia]
 active_bugs:
   BUG-002: ["app/database.py is a dead duplicate Base+models with hardcoded creds, zero importers", app/database.py, awaiting-human-approval-to-delete]
-completed_milestones: [MS-004, MS-005, MS-006, MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013]
+completed_milestones: [MS-004, MS-005, MS-006, MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013, MS-014, MS-015]
 assumptions:
   - "DETECTION_TARGET: 'potholes'"
   - "MAP_MARKER_MEANING: 'one marker per canonical pothole entity (deduplicated across multi-pass recordings)'"
@@ -43,4 +43,6 @@ assumptions:
   - "APP_BUILD: 'Expo EAS Build for native apps - preview profile produces APK (Android), production produces AAB+IPA; bundle IDs com.flux.patrol'"
   - "BODY_SIZE_EXEMPT: '/v1/ingest/upload and /api/uploads bypass MAX_BODY_BYTES (256 KiB); the cap still applies to JSON ingest routes'"
   - "SQLITE_FOR_UPDATE: 'SQLAlchemy 2.0.52 compiles FOR UPDATE to a no-op on SQLite, so the guard in cluster_detection is defensive, not a crash fix (verified)'"
-next_action: "Phase 1 of the upgrade plan: worker publishes to flux:events:live and the SSE generator subscribes with the DB poll as fallback."
+  - "REALTIME_SSE: 'Worker publishes to Redis pub/sub channel flux:events:live after inference; SSE endpoint subscribes (instant) with DB poll fallback'"
+  - "DASHBOARD_WOW: 'sonar pulse on new detections, severity-colored toasts, animated KPI counters, live event count badge'"
+next_action: "Build iOS app via EAS (requires Apple Developer credentials); push to origin."
