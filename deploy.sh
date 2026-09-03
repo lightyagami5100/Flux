@@ -33,13 +33,17 @@ set -a
 source "${REPO_ROOT}/.env"
 set +a
 
-REQUIRED=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB MINIO_ACCESS_KEY MINIO_SECRET_KEY API_KEYS ROBOFLOW_API_KEY ROBOFLOW_MODEL_IDS)
+REQUIRED=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB MINIO_ACCESS_KEY MINIO_SECRET_KEY API_KEYS ROBOFLOW_API_KEY ROBOFLOW_MODEL_IDS CORS_ORIGINS)
 MISSING=()
 for var in "${REQUIRED[@]}"; do
   [[ -n "${!var:-}" ]] || MISSING+=("${var}")
 done
 if ((${#MISSING[@]})); then
   fail "these variables are empty in .env: ${MISSING[*]}"
+fi
+
+if [[ "${CORS_ORIGINS}" == *"*"* ]]; then
+  fail "CORS_ORIGINS contains wildcard '*'. Production requires explicit allowed origin(s)."
 fi
 
 if [[ "${MINIO_ACCESS_KEY}" == "minioadmin" || "${MINIO_SECRET_KEY}" == "minioadmin" ]]; then

@@ -84,6 +84,7 @@ Thumbs.db
 # Logs & temporary files
 *.log
 scratch/
+bin/
 
 # Local model weights. CV inference is remote-only (Roboflow / Alibaba API);
 # nothing in this repo should load weights from disk.

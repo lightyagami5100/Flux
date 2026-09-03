@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Platform, TextInput, Modal } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
+import * as FileSystem from 'expo-file-system';
 
 export default function TabOneScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isPatrolling, setIsPatrolling] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const [bumpCount, setBumpCount] = useState(0);
   const [lastBumpTime, setLastBumpTime] = useState(0);
   const [statusMsg, setStatusMsg] = useState<string>('');
@@ -14,8 +16,23 @@ export default function TabOneScreen() {
   const cameraRef = useRef<CameraView>(null);
   const subscriptionRef = useRef<any>(null);
   
-  // Configurable backend URL via environment variable with localhost default
-  const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/v1/ingest/upload';
+  // Dynamic backend host configuration (can be edited on-screen in demo)
+  const defaultHost = (
+    process.env.EXPO_PUBLIC_API_URL ||
+    (typeof window !== 'undefined' && window.location?.hostname ? `${window.location.hostname}:8000` : 'localhost:8000')
+  )
+    .replace('/v1/ingest/upload', '')
+    .replace('http://', '')
+    .replace('https://', '');
+  const [serverHost, setServerHost] = useState(defaultHost);
+  const [isEditingHost, setIsEditingHost] = useState(false);
+  const [tempHost, setTempHost] = useState(defaultHost);
+
+  const getBackendUrl = () => {
+    const clean = serverHost.trim();
+    const proto = clean.startsWith('http') ? '' : 'http://';
+    return `${proto}${clean}/v1/ingest/upload`;
+  };
 
   useEffect(() => {
     (async () => {
@@ -61,26 +78,29 @@ export default function TabOneScreen() {
   };
 
   const detectBump = async ({ x, y, z }: { x: number; y: number; z: number }) => {
-    // Calculate magnitude of acceleration vector
     const gForce = Math.sqrt(x * x + y * y + z * z);
     
-    // 1g is normal gravity. A spike > 2.0g usually indicates a significant bump
+    // Spike > 2.0g indicates significant bump
     if (gForce > 2.0) {
       const now = Date.now();
-      // Debounce bumps (only trigger once every 3 seconds)
       if (now - lastBumpTime > 3000) {
         setLastBumpTime(now);
         setBumpCount(prev => prev + 1);
-        handleBumpDetected();
+        handleCaptureAndUpload('💥 Bump Detected!');
       }
     }
   };
 
-  const handleBumpDetected = async () => {
-    console.log('💥 BUMP DETECTED! Capturing frame...');
-    setStatusMsg('💥 Bump detected! Uploading...');
+  const handleManualScan = async () => {
+    if (isScanning) return;
+    await handleCaptureAndUpload('📸 Manual Scan');
+  };
+
+  const handleCaptureAndUpload = async (sourceTag: string) => {
+    setIsScanning(true);
+    setStatusMsg(`${sourceTag} Capturing snapshot...`);
     try {
-      // 1. Get current location (fallback to default if unavailable)
+      // 1. Get current GPS location
       let lat = 33.6844;
       let lon = 73.0479;
       try {
@@ -90,61 +110,96 @@ export default function TabOneScreen() {
           lon = loc.coords.longitude;
         }
       } catch (err) {
-        console.warn('Could not get GPS, using default location:', err);
+        console.warn('Could not get GPS, using fallback coordinates:', err);
       }
       
-      // 2. Capture a single photo frame if camera is available
+      // 2. Capture a photo from camera
       if (cameraRef.current) {
         try {
-          const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
+          const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
           if (photo && photo.uri) {
             await uploadFrame(photo.uri, lat, lon);
             return;
           }
         } catch (camErr) {
-          console.warn('Camera snapshot not available, falling back to synthetic sample:', camErr);
+          console.warn('Camera snapshot failed, using synthetic fallback:', camErr);
         }
       }
 
-      // Fallback: Upload a 1x1 test JPEG if camera is unavailable (e.g. desktop web)
+      // Fallback: 1x1 test JPEG if camera unavailable
       await uploadSyntheticFrame(lat, lon);
     } catch (e: any) {
-      console.error('Error capturing bump:', e);
+      console.error('Error during capture:', e);
       setStatusMsg(`❌ Error: ${e.message || e}`);
+    } finally {
+      setIsScanning(false);
     }
   };
 
   const uploadSyntheticFrame = async (lat: number, lon: number) => {
+    let sampleFile: string | null = null;
     try {
-      // Minimal valid 1x1 JPEG base64
       const dummyJpegBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
-      const byteCharacters = atob(dummyJpegBase64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
       const formData = new FormData();
-      formData.append('video', blob, 'sample_frame.jpg');
+
+      if (Platform.OS === 'web') {
+        let blob: Blob | null = null;
+        try {
+          const sampleUrl = getBackendUrl().replace('/v1/ingest/upload', '/static/sample_pothole.jpg');
+          const imgRes = await fetch(sampleUrl);
+          if (imgRes.ok) {
+            blob = await imgRes.blob();
+          }
+        } catch (_) {}
+
+        if (!blob) {
+          const byteCharacters = atob(dummyJpegBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          blob = new Blob([byteArray], { type: 'image/jpeg' });
+        }
+        formData.append('video', blob, 'sample_pothole.jpg');
+      } else {
+        sampleFile = `${(FileSystem as any).cacheDirectory || ''}sample_frame_${Date.now()}.jpg`;
+        await FileSystem.writeAsStringAsync(sampleFile, dummyJpegBase64, {
+          encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any,
+        });
+        formData.append('video', {
+          uri: sampleFile,
+          name: 'sample_frame.jpg',
+          type: 'image/jpeg',
+        } as any);
+      }
+
       formData.append('lat', lat.toString());
       formData.append('lon', lon.toString());
 
-      console.log('Uploading simulated frame to:', BACKEND_URL);
-      const response = await fetch(BACKEND_URL, {
+      setStatusMsg('📡 Uploading to AI Worker...');
+      const response = await fetch(getBackendUrl(), {
         method: 'POST',
         body: formData,
         headers: { 'Accept': 'application/json' },
       });
+
+      if (sampleFile) {
+        await FileSystem.deleteAsync(sampleFile, { idempotent: true }).catch(() => {});
+      }
+
       if (response.ok) {
-        setStatusMsg('✅ Bump uploaded & sent to AI worker!');
+        const data = await response.json();
+        setStatusMsg(`✅ Sent to AI Worker! Event #${(data.event_id || '').substring(0, 8)}`);
       } else {
         setStatusMsg(`❌ Server returned ${response.status}`);
       }
     } catch (err: any) {
+      if (sampleFile) {
+        await FileSystem.deleteAsync(sampleFile, { idempotent: true }).catch(() => {});
+      }
       console.error('Synthetic upload failed:', err);
-      setStatusMsg(`❌ Upload failed: ${err.message || err}`);
+      setStatusMsg(`❌ Connection failed to ${serverHost}`);
     }
   };
 
@@ -167,22 +222,23 @@ export default function TabOneScreen() {
       formData.append('lat', lat.toString());
       formData.append('lon', lon.toString());
 
-      console.log('Uploading bump frame...');
-      const response = await fetch(BACKEND_URL, {
+      setStatusMsg('📡 Uploading to Flux Backend...');
+      const response = await fetch(getBackendUrl(), {
         method: 'POST',
         body: formData,
         headers: { 'Accept': 'application/json' },
       });
       
       if (response.ok) {
-        console.log('✅ Frame uploaded successfully');
-        setStatusMsg('✅ Frame uploaded to worker!');
+        const data = await response.json();
+        console.log('✅ Frame uploaded successfully:', data);
+        setStatusMsg(`✅ Ingested! Event #${(data.event_id || '').substring(0, 8)}`);
       } else {
-        setStatusMsg(`❌ Upload failed with status: ${response.status}`);
+        setStatusMsg(`❌ Upload status ${response.status}`);
       }
     } catch (error: any) {
       console.error('❌ Upload failed:', error);
-      setStatusMsg(`❌ Upload error: ${error.message || error}`);
+      setStatusMsg(`❌ Network Error: Could not connect to ${serverHost}`);
     }
   };
 
@@ -190,7 +246,7 @@ export default function TabOneScreen() {
     if (isPatrolling) {
       setIsPatrolling(false);
       _unsubscribe();
-      setStatusMsg('Patrol stopped');
+      setStatusMsg('Patrol paused');
     } else {
       setIsPatrolling(true);
       _subscribe();
@@ -228,42 +284,113 @@ export default function TabOneScreen() {
   const renderOverlayContent = () => (
     <>
       <View style={styles.overlay}>
+        <TouchableOpacity
+          style={styles.hostBadge}
+          onPress={() => {
+            setTempHost(serverHost);
+            setIsEditingHost(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.hostBadgeText}>🌐 Server: {serverHost} ✏️</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Smart Patrol (سمارٹ پٹرول)</Text>
         <Text style={styles.subtitle}>
-          {isPatrolling ? '🟢 Active (نگرانی جاری ہے)' : 'Paused (رک گیا)'}
+          {isPatrolling ? '🟢 Auto-Patrol Active' : 'Standby Mode'}
         </Text>
         
-        {isPatrolling && (
+        {/* Viewfinder Target Reticle */}
+        <View style={styles.viewfinderBox}>
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
+          <Text style={styles.viewfinderLabel}>Align Road Hazard in Frame</Text>
+        </View>
+
+        {statusMsg ? (
           <View style={styles.statsCard}>
-            <Text style={styles.statsText}>Bumps Detected: {bumpCount}</Text>
-            <Text style={styles.statsSub}>Auto-uploading snapshot on bump</Text>
-            {statusMsg ? <Text style={styles.statusMsg}>{statusMsg}</Text> : null}
+            <Text style={styles.statusMsg}>{statusMsg}</Text>
+            {isPatrolling && <Text style={styles.statsSub}>Bumps detected: {bumpCount}</Text>}
           </View>
-        )}
+        ) : null}
       </View>
 
-      <View style={styles.buttonContainer}>
+      <View style={styles.buttonDeck}>
+        {/* Main Instant Scan Action */}
         <TouchableOpacity
-          style={[styles.button, isPatrolling && styles.buttonRecording]}
-          onPress={togglePatrol}
+          style={[styles.mainScanButton, isScanning && styles.buttonDisabled]}
+          onPress={handleManualScan}
+          disabled={isScanning}
         >
-          <Text style={styles.buttonText}>
-            {isPatrolling ? 'Stop Patrol (روکیں)' : 'Start Patrol (شروع کریں)'}
+          <Text style={styles.mainScanButtonText}>
+            {isScanning ? '⏳ Analyzing...' : '📸 Scan Road Hazard Now (فوری معائنہ)'}
           </Text>
         </TouchableOpacity>
 
-        {isPatrolling && (
+        {/* Secondary Row: Auto-Patrol & Test Bump */}
+        <View style={styles.secondaryRow}>
           <TouchableOpacity
-            style={[styles.button, styles.triggerButton]}
+            style={[styles.subButton, isPatrolling && styles.buttonRecording]}
+            onPress={togglePatrol}
+          >
+            <Text style={styles.subButtonText}>
+              {isPatrolling ? '⏹ Stop Patrol' : '🚗 Start Auto-Patrol'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subButton, styles.triggerButton]}
             onPress={() => {
               setBumpCount(prev => prev + 1);
-              handleBumpDetected();
+              handleCaptureAndUpload('💥 Bump Trigger');
             }}
           >
-            <Text style={styles.buttonText}>💥 Trigger Bump (Test)</Text>
+            <Text style={styles.subButtonText}>💥 Trigger Bump</Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
+
+      {/* Host Configuration Modal for Venue Wi-Fi Changes */}
+      <Modal visible={isEditingHost} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Configure Server Address</Text>
+            <Text style={styles.modalSub}>
+              Enter your laptop's current Wi-Fi IP and port (e.g. 192.168.10.9:8000 or ngrok host):
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={tempHost}
+              onChangeText={setTempHost}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="e.g. 192.168.10.9:8000"
+              placeholderTextColor="#777"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setIsEditingHost(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnSave}
+                onPress={() => {
+                  const cleaned = tempHost.trim().replace('/v1/ingest/upload', '');
+                  setServerHost(cleaned);
+                  setIsEditingHost(false);
+                  setStatusMsg(`📡 Server updated to ${cleaned}`);
+                }}
+              >
+                <Text style={styles.modalBtnSaveText}>Save IP</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 
@@ -281,16 +408,118 @@ const styles = StyleSheet.create({
   webFallbackTitle: { color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 40 },
   webFallbackText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginHorizontal: 20, marginTop: 8 },
   permissionBtn: { marginTop: 12, backgroundColor: '#007AFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  overlay: { position: 'absolute', top: 50, width: '100%', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
-  subtitle: { fontSize: 16, color: 'white', marginTop: 5, fontWeight: '500' },
-  statsCard: { marginTop: 15, backgroundColor: 'rgba(0,0,0,0.75)', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', width: '85%' },
-  statsText: { color: '#30d158', fontSize: 18, fontWeight: 'bold' },
-  statsSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
-  statusMsg: { color: '#ffd60a', fontSize: 12, marginTop: 6, fontWeight: '600', textAlign: 'center' },
-  buttonContainer: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', gap: 12 },
-  button: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#007AFF', padding: 16, borderRadius: 12, minHeight: 54 },
+  overlay: { position: 'absolute', top: 44, width: '100%', alignItems: 'center' },
+  
+  hostBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(100, 210, 255, 0.4)',
+    marginBottom: 8,
+  },
+  hostBadgeText: { color: '#64D2FF', fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+
+  title: { fontSize: 22, fontWeight: 'bold', color: 'white', textShadowColor: 'black', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 },
+  subtitle: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '500' },
+  
+  viewfinderBox: {
+    width: 260,
+    height: 180,
+    marginTop: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  corner: { position: 'absolute', width: 22, height: 22, borderColor: '#34C759' },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 6 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 6 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 6 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 6 },
+  viewfinderLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+
+  statsCard: { marginTop: 16, backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', maxWidth: '90%' },
+  statusMsg: { color: '#FFD60A', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  statsSub: { color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4 },
+
+  buttonDeck: { position: 'absolute', bottom: 30, left: 16, right: 16, gap: 10 },
+  mainScanButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#34C759',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mainScanButtonText: { color: 'white', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  buttonDisabled: { backgroundColor: '#555', opacity: 0.7 },
+
+  secondaryRow: { flexDirection: 'row', gap: 10 },
+  subButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    minHeight: 46,
+  },
   buttonRecording: { backgroundColor: '#FF3B30' },
-  triggerButton: { backgroundColor: '#ff9500' },
+  triggerButton: { backgroundColor: '#FF9500' },
+  subButtonText: { fontSize: 13, fontWeight: '700', color: 'white', textAlign: 'center' },
   buttonText: { fontSize: 16, fontWeight: 'bold', color: 'white', textAlign: 'center' },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 8 },
+  modalSub: { fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 18, marginBottom: 16 },
+  modalInput: {
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#64D2FF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 20,
+  },
+  modalActions: { flexDirection: 'row', gap: 10 },
+  modalBtnCancel: {
+    flex: 1,
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalBtnCancelText: { color: 'white', fontSize: 14, fontWeight: '600' },
+  modalBtnSave: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalBtnSaveText: { color: 'white', fontSize: 14, fontWeight: '700' },
 });
+

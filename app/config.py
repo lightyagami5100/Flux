@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     # tool in the repo yet, so this stays on in production too.
     auto_create_tables: bool = True
 
+    # --- CORS ---
+    # Comma-separated allowed origins. "*" is only accepted in non-production.
+    # Production must list explicit origins (e.g. "https://flux.example.com").
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["*"])
+
+    # --- Upload auth ---
+    # When False, /v1/ingest/upload and /api/uploads/* are open (hackathon/demo).
+    # Production enforces True: uploads require a valid X-API-Key.
+    require_upload_auth: bool = False
+
     # --- Device auth: JSON object mapping api_key -> device_id ---
     # e.g. API_KEYS='{"dev-key-camera-1": "cam-01", "dev-key-edge-9": "edge-09"}'
     api_keys: dict[str, str] = Field(default_factory=dict)
@@ -78,6 +88,14 @@ class Settings(BaseSettings):
         NoDecode stops pydantic-settings from trying to JSON-parse the env
         value first, which would reject a plain comma-separated string.
         """
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_cors_origins(cls, v: object) -> object:
+        """Accept comma-separated string or list."""
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
@@ -122,6 +140,10 @@ class Settings(BaseSettings):
             not self.roboflow_model_ids or "coco/3" in self.roboflow_model_ids
         ):
             problems.append("ROBOFLOW_MODEL_IDS")
+        if "*" in self.cors_origins:
+            problems.append("CORS_ORIGINS")
+        if not self.require_upload_auth:
+            problems.append("REQUIRE_UPLOAD_AUTH")
         return problems
 
 

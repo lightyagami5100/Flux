@@ -340,10 +340,42 @@ class DetectionWorker:
         )
         async with self.session_factory() as session:
             async with session.begin():
-                await session.execute(stmt)
-                
-                # If event has geo coordinates, cluster it into a CanonicalPothole
-                if event.latitude is not None and event.longitude is not None and object_count > 0:
+                bind = session.bind
+                dialect = getattr(bind.dialect, "name", "") if bind and hasattr(bind, "dialect") else ""
+                if dialect == "sqlite":
+                    existing = await session.get(DetectionEvent, event.event_id)
+                    if existing:
+                        existing.status = DetectionStatus.PROCESSED
+                        existing.processed_at = now
+                        existing.object_count = object_count
+                        existing.objects = final_objects
+                        existing.metrics = metrics
+                        existing.processing_ms = processing_ms
+                        existing.error = None
+                        persisted_event = existing
+                    else:
+                        persisted_event = DetectionEvent(
+                            event_id=event.event_id,
+                            device_id=device_id,
+                            schema_version=event.schema_version,
+                            captured_at=event.captured_at,
+                            received_at=received_at,
+                            processed_at=now,
+                            status=DetectionStatus.PROCESSED,
+                            media_kind=event.media.kind,
+                            media_uri=event.media.uri,
+                            media_sha256=event.media.sha256,
+                            latitude=event.latitude,
+                            longitude=event.longitude,
+                            object_count=object_count,
+                            objects=final_objects,
+                            metrics=metrics,
+                            processing_ms=processing_ms,
+                            error=None,
+                        )
+                        session.add(persisted_event)
+                else:
+                    await session.execute(stmt)
                     persisted_event = DetectionEvent(
                         event_id=event.event_id,
                         device_id=device_id,
@@ -362,6 +394,9 @@ class DetectionWorker:
                         metrics=metrics,
                         processing_ms=processing_ms,
                     )
+                
+                # If event has geo coordinates, cluster it into a CanonicalPothole
+                if event.latitude is not None and event.longitude is not None and object_count > 0:
                     try:
                         canonical, _is_new = await cluster_detection(session, persisted_event)
                     except Exception as e:
@@ -413,34 +448,64 @@ class DetectionWorker:
         """Best-effort audit row; never mask the DLQ path."""
         try:
             now = datetime.now(UTC)
-            stmt = (
-                pg_insert(DetectionEvent)
-                .values(
-                    event_id=event.event_id,
-                    device_id=device_id,
-                    schema_version=event.schema_version,
-                    captured_at=event.captured_at,
-                    received_at=received_at,
-                    processed_at=now,
-                    status=DetectionStatus.FAILED,
-                    media_kind=event.media.kind,
-                    media_uri=event.media.uri,
-                    media_sha256=event.media.sha256,
-                    latitude=event.latitude,
-                    longitude=event.longitude,
-                    object_count=len(event.objects),
-                    objects=[o.model_dump() for o in event.objects],
-                    metrics={},
-                    error=f"{type(exc).__name__}: {exc}"[:2000],
-                )
-                .on_conflict_do_update(
-                    index_elements=[DetectionEvent.event_id],
-                    set_={"status": DetectionStatus.FAILED, "error": f"{type(exc).__name__}: {exc}"[:2000]},
-                )
-            )
+            error_str = f"{type(exc).__name__}: {exc}"[:2000]
             async with self.session_factory() as session:
                 async with session.begin():
-                    await session.execute(stmt)
+                    bind = session.bind
+                    dialect = getattr(bind.dialect, "name", "") if bind and hasattr(bind, "dialect") else ""
+                    if dialect == "sqlite":
+                        existing = await session.get(DetectionEvent, event.event_id)
+                        if existing:
+                            existing.status = DetectionStatus.FAILED
+                            existing.processed_at = now
+                            existing.error = error_str
+                        else:
+                            persisted_event = DetectionEvent(
+                                event_id=event.event_id,
+                                device_id=device_id,
+                                schema_version=event.schema_version,
+                                captured_at=event.captured_at,
+                                received_at=received_at,
+                                processed_at=now,
+                                status=DetectionStatus.FAILED,
+                                media_kind=event.media.kind,
+                                media_uri=event.media.uri,
+                                media_sha256=event.media.sha256,
+                                latitude=event.latitude,
+                                longitude=event.longitude,
+                                object_count=len(event.objects),
+                                objects=[o.model_dump() for o in event.objects],
+                                metrics={},
+                                error=error_str,
+                            )
+                            session.add(persisted_event)
+                    else:
+                        stmt = (
+                            pg_insert(DetectionEvent)
+                            .values(
+                                event_id=event.event_id,
+                                device_id=device_id,
+                                schema_version=event.schema_version,
+                                captured_at=event.captured_at,
+                                received_at=received_at,
+                                processed_at=now,
+                                status=DetectionStatus.FAILED,
+                                media_kind=event.media.kind,
+                                media_uri=event.media.uri,
+                                media_sha256=event.media.sha256,
+                                latitude=event.latitude,
+                                longitude=event.longitude,
+                                object_count=len(event.objects),
+                                objects=[o.model_dump() for o in event.objects],
+                                metrics={},
+                                error=error_str,
+                            )
+                            .on_conflict_do_update(
+                                index_elements=[DetectionEvent.event_id],
+                                set_={"status": DetectionStatus.FAILED, "error": error_str},
+                            )
+                        )
+                        await session.execute(stmt)
         except Exception:
             logger.exception("could not persist failure record for event=%s", event.event_id)
 

@@ -1,39 +1,61 @@
-# Keep the build context small and free of secrets/artifacts.
-.git
-.gitignore
-.venv
-venv
-__pycache__
-**/__pycache__
+# ── Virtual environments & dependency caches ──
+.venv/
+env/
+venv/
+__pycache__/
 *.py[cod]
-.pytest_cache
-.ruff_cache
+*.egg-info/
 
-# Secrets — never bake into an image.
-.env
-.env.*
-!.env.example
-
-# Local databases and dev artifacts
-*.db
-*.sqlite3
-
-# Local model weights: inference is remote only.
-*.pt
-*.onnx
-*.weights
-
-# Mobile app is built and shipped separately.
+# ── Mobile app (separate build pipeline) ──
 mobile/
 
-# Tooling / agent state
+# ── Git & IDE ──
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
 .qoder/
 .agents/
 .claude/
-STATE.yaml
 
-# Docs and CI
+# ── Test & lint caches ──
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ── Local data (never ship to prod image) ──
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+*.sqlite3
+flux_dev.db
+data/
+
+# ── Model weights — inference is remote only ──
+*.pt
+*.pth
+*.onnx
+*.weights
+
+# ── Scratch & temp ──
+scratch/
+bin/
+*.log
+*.swp
+*.swo
+*~
+
+# ── Secrets ──
+.env
+.env.local
+.env.*.local
+
+# ── Docs & non-runtime ──
 README.md
 AGENTS.md
-tests/
-requirements-dev.txt
+STATE.yaml

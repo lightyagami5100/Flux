@@ -3,7 +3,10 @@ repo_map:
   mobile/eas.json: [EAS Build profiles: development, preview (APK), production (AAB/IPA)]
   app/main.py: [app, get_all_detections, get_potholes, get_pothole_detail, get_pothole_media, update_pothole_status, rebuild_clusters, export_geojson, get_detection_detail, get_detection_media, sse_events, get_stats, get_notifications, seed_data, create_upload_session, upload_chunk, complete_upload, cancel_upload, ingest_detection, upload_and_ingest, healthz, livez, readyz, prometheus_metrics]
   app/models.py: [Base, DetectionStatus, PotholeStatus, CanonicalPothole, DetectionEvent]
-  app/deduplication.py: [haversine_distance, compute_event_severity, compute_event_confidence, escalate_severity, cluster_detection, recluster_all_events, _dialect_name, DEFAULT_DEDUP_RADIUS_METERS]
+  app/severity.py: [compute_severity, escalate_severity, extract_class_label, SEVERITY_RANKS]
+  app/visualization.py: [render_road_snapshot_svg]
+  app/seed.py: [seed_database, SAMPLE_RECORDS]
+  app/deduplication.py: [haversine_distance, compute_event_severity, compute_event_confidence, escalate_severity, cluster_detection, recluster_all_events, DEFAULT_DEDUP_RADIUS_METERS]
   app/config.py: [Settings, get_settings, is_production, missing_production_settings, roboflow_model_ids]
   app/processors/roboflow.py: [RoboflowProcessor, CircuitBreakerOpen, ProcessorUnavailable, MediaUndecodable]
   app/processors/base.py: [BaseProcessor, PermanentProcessingError, Detection, ProcessingResult, MediaType]
@@ -19,12 +22,13 @@ repo_map:
   tests/test_visualization.py: [TestVisualizationAPI]
   tests/test_deduplication.py: [test_haversine_distance_zero, test_haversine_distance_small, test_escalate_severity, TestSpatialClusteringEngine, TestRebuildAgainstSQLite, TestPotholeEndpointsAPI]
   tests/test_health_and_metrics.py: [TestHealthProbes, TestPrometheusMetrics]
-  tests/test_config_guard.py: [test_development_defaults_are_allowed_outside_production, test_production_rejects_the_placeholder_coco_model, test_fully_configured_production_reports_no_problems, test_production_rejects_default_database_credentials, test_production_rejects_empty_api_keys, test_production_rejects_minioadmin_credentials, test_production_rejects_missing_roboflow_key_when_processor_selected]
+  tests/test_config_guard.py: [test_development_defaults_are_allowed_outside_production, test_production_rejects_the_placeholder_coco_model, test_fully_configured_production_reports_no_problems, test_production_rejects_default_database_credentials, test_production_rejects_empty_api_keys, test_production_rejects_minioadmin_credentials, test_production_rejects_missing_roboflow_key_when_processor_selected, test_production_rejects_wildcard_cors, test_production_rejects_unauthenticated_uploads]
   tests/test_worker.py: [TestMediaFetch, TestHandleDelivery]
   tests/test_video_sampling.py: [TestVideoSampling, TestUndecodableMedia]
-active_bugs:
-  BUG-002: ["app/database.py is a dead duplicate Base+models with hardcoded creds, zero importers", app/database.py, awaiting-human-approval-to-delete]
-completed_milestones: [MS-004, MS-005, MS-006, MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013, MS-014, MS-015]
+  tests/test_severity.py: [test_severity_ranks, test_compute_severity_default, test_compute_severity_from_bbox, test_compute_severity_metrics_override, test_escalate_severity, test_extract_class_label]
+  tests/test_visualization_module.py: [test_render_road_snapshot_svg_classes]
+active_bugs: {}
+completed_milestones: [MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013, MS-014, MS-015, MS-016]
 assumptions:
   - "DETECTION_TARGET: 'potholes'"
   - "MAP_MARKER_MEANING: 'one marker per canonical pothole entity (deduplicated across multi-pass recordings)'"
@@ -39,7 +43,8 @@ assumptions:
   - "VIDEO_SAMPLING: 'fixed stride (every 15th frame, max 20) - no motion/bump gating, so smooth road still costs 20 API calls'"
   - "ROBOFLOW_MODEL: 'two public Universe models live-verified with the workspace key (1 probe call each): pothole-detection-03iso/1 (Potholes, mAP@50 0.556) + damage-road/1 (pothole+crack, mAP@50 0.719), set via ROBOFLOW_MODEL_IDS in local .env'"
   - "MULTI_MODEL_COST: 'calls per clip = sampled frames x len(models); default 20 x 2 = 40'"
-  - "UPLOAD_AUTH: '/v1/ingest/upload and /api/uploads are intentionally unauthenticated for now, so the mobile app (which sends no X-API-Key) works; tighten before any public deployment'"
+  - "UPLOAD_AUTH: 'require_upload_auth setting: defaults to False for mobile app hackathon mode, True enforced in production'"
+  - "CORS_ORIGINS: 'cors_origins setting: wildcard allowed in development, production requires explicit origin list'"
   - "APP_BUILD: 'Expo EAS Build for native apps - preview profile produces APK (Android), production produces AAB+IPA; bundle IDs com.flux.patrol'"
   - "BODY_SIZE_EXEMPT: '/v1/ingest/upload and /api/uploads bypass MAX_BODY_BYTES (256 KiB); the cap still applies to JSON ingest routes'"
   - "SQLITE_FOR_UPDATE: 'SQLAlchemy 2.0.52 compiles FOR UPDATE to a no-op on SQLite, so the guard in cluster_detection is defensive, not a crash fix (verified)'"

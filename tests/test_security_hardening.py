@@ -114,3 +114,36 @@ def test_upload_invalid_chunk_count_validation():
             latitude=33.72,
             longitude=73.09,
         )
+
+
+def test_seed_endpoint_disabled_in_production(client: TestClient):
+    """POST /seed must return 404 in production to prevent unauthorized data loss."""
+    from unittest.mock import patch, MagicMock
+    with patch("app.main.get_settings") as mock_get_settings:
+        mock_settings = MagicMock()
+        mock_settings.is_production = True
+        mock_settings.max_body_bytes = 262144
+        mock_get_settings.return_value = mock_settings
+
+        res = client.post("/seed")
+        assert res.status_code == 404
+        assert "not available in production" in res.json()["detail"].lower()
+
+
+def test_upload_auth_enforced_when_required(client: TestClient):
+    """When REQUIRE_UPLOAD_AUTH is True, /api/uploads must reject requests without X-API-Key."""
+    from unittest.mock import patch, MagicMock
+    with patch("app.deps.get_settings") as mock_get_settings:
+        mock_settings = MagicMock()
+        mock_settings.require_upload_auth = True
+        mock_settings.api_keys = {"secret-key": "dev-01"}
+        mock_get_settings.return_value = mock_settings
+
+        # Without X-API-Key -> 401
+        res = client.post("/api/uploads", json={
+            "filename": "video.mp4",
+            "total_chunks": 3,
+            "latitude": 33.72,
+            "longitude": 73.09,
+        })
+        assert res.status_code == 401

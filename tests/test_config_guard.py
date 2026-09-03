@@ -13,6 +13,8 @@ def _settings(**overrides: object) -> Settings:
         "minio_secret_key": "real-secret",
         "roboflow_api_key": "rf-key",
         "roboflow_model_ids": ["potholes/7"],
+        "cors_origins": ["https://flux.example.com"],
+        "require_upload_auth": True,
     }
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[arg-type]
@@ -55,3 +57,13 @@ def test_production_rejects_minioadmin_credentials() -> None:
 def test_production_rejects_missing_roboflow_key_when_processor_selected() -> None:
     s = _settings(processor_name="roboflow", roboflow_api_key="")
     assert "ROBOFLOW_API_KEY" in s.missing_production_settings()
+
+
+def test_production_rejects_wildcard_cors() -> None:
+    s = _settings(cors_origins=["*"])
+    assert "CORS_ORIGINS" in s.missing_production_settings()
+
+
+def test_production_rejects_unauthenticated_uploads() -> None:
+    s = _settings(require_upload_auth=False)
+    assert "REQUIRE_UPLOAD_AUTH" in s.missing_production_settings()

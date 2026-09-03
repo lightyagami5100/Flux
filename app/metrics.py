@@ -6,7 +6,7 @@ heavy dependencies, exporting standard text/plain version 0.0.4 output.
 from __future__ import annotations
 
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -14,12 +14,14 @@ from starlette.responses import Response
 
 
 class MetricsRegistry:
-    """Thread-safe in-memory metric accumulator."""
+    """Thread-safe in-memory metric accumulator with bounded histogram storage."""
 
-    def __init__(self):
+    def __init__(self, max_samples: int = 5000):
         self.counters: dict[str, dict[tuple, float]] = defaultdict(lambda: defaultdict(float))
         self.gauges: dict[str, dict[tuple, float]] = defaultdict(lambda: defaultdict(float))
-        self.histograms: dict[str, list[float]] = defaultdict(list)
+        self.histogram_counts: dict[str, int] = defaultdict(int)
+        self.histogram_sums: dict[str, float] = defaultdict(float)
+        self.histograms: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=max_samples))
 
     def inc_counter(self, name: str, value: float = 1.0, **labels):
         label_key = tuple(sorted(labels.items()))
@@ -30,6 +32,8 @@ class MetricsRegistry:
         self.gauges[name][label_key] = value
 
     def observe_histogram(self, name: str, value: float):
+        self.histogram_counts[name] += 1
+        self.histogram_sums[name] += value
         self.histograms[name].append(value)
 
     def generate_prometheus_text(self) -> str:
@@ -55,13 +59,14 @@ class MetricsRegistry:
                 else:
                     lines.append(f"{name} {val}")
 
-        # Histograms / Summaries
-        for name, samples in self.histograms.items():
-            if not samples:
+        # Histograms / Summaries (bounded, using exact counts and sums)
+        all_hist_names = sorted(set(self.histograms.keys()) | set(self.histogram_counts.keys()))
+        for name in all_hist_names:
+            count = self.histogram_counts[name]
+            if count == 0:
                 continue
             lines.append(f"# TYPE {name} summary")
-            count = len(samples)
-            total = sum(samples)
+            total = self.histogram_sums[name]
             lines.append(f"{name}_count {count}")
             lines.append(f"{name}_sum {total:.6f}")
 

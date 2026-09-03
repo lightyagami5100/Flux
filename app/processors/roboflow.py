@@ -81,24 +81,26 @@ class RoboflowProcessor(BaseProcessor):
         self._cb_reset_time: float = 0.0
 
     def load(self) -> None:
-        """Initialize the InferenceHTTPClient."""
+        """Initialize the Roboflow client or prepare pure HTTP fallback."""
         logger.info("Initializing Roboflow inference client...")
-        if InferenceHTTPClient is None:
-            raise ProcessorUnavailable(
-                "inference-sdk is not installed; the Roboflow processor cannot run. "
-                "Install it (see requirements.txt) or set PROCESSOR_NAME to another backend."
-            )
-
         api_key = self.settings.roboflow_api_key
         if not api_key:
             raise ProcessorUnavailable(
                 "ROBOFLOW_API_KEY is not set; refusing to start the Roboflow processor."
             )
 
-        self.client = InferenceHTTPClient(
-            api_url="https://detect.roboflow.com",
-            api_key=api_key,
-        )
+        if InferenceHTTPClient is not None:
+            try:
+                self.client = InferenceHTTPClient(
+                    api_url="https://detect.roboflow.com",
+                    api_key=api_key,
+                )
+            except Exception as e:
+                logger.warning("Could not initialize InferenceHTTPClient (%s); using HTTP REST fallback", e)
+                self.client = None
+        else:
+            logger.info("inference-sdk not available on this interpreter; using direct HTTP REST client")
+            self.client = None
 
     def infer(self, media_bytes: bytes, media_type: MediaType, file_id: str) -> ProcessingResult:
         """Run inference using the Roboflow Inference HTTP API."""
@@ -202,7 +204,32 @@ class RoboflowProcessor(BaseProcessor):
             reraise=True,
         )
         def _do_infer() -> dict[str, Any]:
-            return self.client.infer(image, model_id=model_id)
+            if self.client is not None:
+                return self.client.infer(image, model_id=model_id)
+
+            # Direct HTTP REST fallback when inference-sdk is not present
+            import cv2
+            import httpx
+            import base64
+
+            # Encode BGR image array to JPEG
+            ok, buffer = cv2.imencode('.jpg', image)
+            if not ok:
+                raise ValueError("Could not encode frame to JPEG for Roboflow API")
+
+            img_b64 = base64.b64encode(buffer).decode('utf-8')
+            endpoint = f"https://detect.roboflow.com/{model_id}"
+
+            with httpx.Client(timeout=20.0) as http_client:
+                resp = http_client.post(
+                    endpoint,
+                    params={"api_key": self.settings.roboflow_api_key},
+                    data=img_b64,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Roboflow API error ({resp.status_code}): {resp.text}")
+                return resp.json()
 
         detections: list[Detection] = []
         try:

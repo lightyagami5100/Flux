@@ -1645,6 +1645,11 @@
             </div>
 
             <div class="island-right">
+                <button class="island-pill-btn" style="background:var(--primary-bg); border-color:var(--primary-border); color:var(--primary); font-weight:700;" onclick="openLiveLabModal()" title="Live Edge Ingestion Lab">
+                    <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+                    <span>Live AI Test</span>
+                </button>
+
                 <button class="island-pill-btn" id="btn-heat-hud" onclick="toggleHeatmap()">
                     <i data-lucide="flame" style="width:14px;height:14px;"></i>
                     <span id="heat-label">Heatmap</span>
@@ -1763,9 +1768,13 @@
 
             <!-- Action Dock -->
             <div class="sidebar-action-dock">
-                <button class="btn-dock-primary" id="btn-simulate-action" onclick="triggerSimulation()">
-                    <i data-lucide="plus-circle" style="width:15px;height:15px;"></i>
-                    <span>Simulate Ingest</span>
+                <button class="btn-dock-primary" id="btn-live-test" onclick="openLiveLabModal()" style="background: linear-gradient(135deg, #0071E3 0%, #5856D6 100%);">
+                    <i data-lucide="sparkles" style="width:15px;height:15px;"></i>
+                    <span>Live AI Test</span>
+                </button>
+                <button class="btn-dock-secondary" id="btn-simulate-action" onclick="triggerSimulation()" title="Seed Multi-City Telemetry">
+                    <i data-lucide="database" style="width:15px;height:15px;"></i>
+                    <span>Seed</span>
                 </button>
                 <a href="/detections/export/geojson" download="flux_anomalies.geojson" class="btn-dock-secondary" title="Export GeoJSON">
                     <i data-lucide="download" style="width:15px;height:15px;"></i>
@@ -1879,6 +1888,97 @@
                 </div>
 
                 <div style="margin-top:auto; padding-top:12px; display:flex; gap:8px;" id="drawer-action-slot"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIVE EDGE AI INGESTION & CV LAB MODAL (Apple Vision-OS Liquid Glass) -->
+    <div class="drawer-scrim" id="lab-modal-scrim" onclick="dismissLabModal()">
+        <div class="drawer-panel" style="max-width: 520px;" onclick="event.stopPropagation()">
+            <div class="drawer-head">
+                <div class="drawer-head-title" style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:18px;">⚡</span>
+                    <span>Live Edge AI Ingestion Lab</span>
+                </div>
+                <button class="drawer-close-btn" onclick="dismissLabModal()">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+
+            <div class="drawer-scroll-body" style="padding:20px; gap:16px;">
+                <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
+                    Simulate real-world road camera telemetry. Transmits a dashcam snapshot to the Ingestion Gateway (<code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-glass-inset);padding:2px 6px;border-radius:4px;">POST /v1/ingest/upload</code>) to test live Roboflow perception, spatial centroid deduplication, and SSE radar streaming.
+                </div>
+
+                <!-- PRESET BUTTONS -->
+                <div style="background:var(--bg-glass-card); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:14px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">
+                        One-Click Live Test Scenarios
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button class="btn-dock-primary" style="justify-content:flex-start; text-align:left; padding:10px 14px;" onclick="runPresetIngestion('pothole_isb')">
+                            <span style="font-size:18px;">🕳️</span>
+                            <div style="flex:1; margin-left:8px;">
+                                <div style="font-weight:700; font-size:13px;">Severe Pothole — Jinnah Ave, Islamabad</div>
+                                <div style="font-size:11px; opacity:0.85;">Coords: 33.7202, 73.0898 · Real JPEG · Live Roboflow CV</div>
+                            </div>
+                        </button>
+                        <button class="btn-dock-secondary" style="justify-content:flex-start; text-align:left; padding:10px 14px;" onclick="runPresetIngestion('crack_isb')">
+                            <span style="font-size:18px;">⚡</span>
+                            <div style="flex:1; margin-left:8px;">
+                                <div style="font-weight:700; font-size:13px;">Road Surface Fatigue Crack — Srinagar Highway</div>
+                                <div style="font-size:11px; color:var(--text-secondary);">Coords: 33.6848, 73.0483 · Real JPEG · Micro-fracture detection</div>
+                            </div>
+                        </button>
+                        <button class="btn-dock-secondary" style="justify-content:flex-start; text-align:left; padding:10px 14px;" onclick="runPresetIngestion('water_isb')">
+                            <span style="font-size:18px;">🌊</span>
+                            <div style="flex:1; margin-left:8px;">
+                                <div style="font-weight:700; font-size:13px;">Monsoon Waterlogging — Faizabad Interchange</div>
+                                <div style="font-size:11px; color:var(--text-secondary);">Coords: 33.6524, 73.0815 · Real JPEG · Flood pool hazard</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CUSTOM UPLOAD DROPZONE -->
+                <div style="background:var(--bg-glass-card); border:1px dashed var(--border-highlight); border-radius:var(--radius-xl); padding:16px; text-align:center;">
+                    <div style="font-size:13px; font-weight:700; margin-bottom:6px; color:var(--text-primary);">
+                        📁 Or Ingest Any Photo from Your Laptop
+                    </div>
+                    <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">
+                        Drop any road damage photo to test external AI perception live.
+                    </div>
+                    <input type="file" id="lab-custom-file" accept="image/*" style="display:none;" onchange="handleLabFileSelected(event)">
+                    <button class="btn-dock-secondary" style="margin:0 auto;" onclick="document.getElementById('lab-custom-file').click()">
+                        <i data-lucide="upload-cloud" style="width:14px;height:14px;"></i>
+                        <span id="lab-file-btn-text">Select Road Image...</span>
+                    </button>
+                    <div id="lab-file-preview" style="display:none; margin-top:10px;">
+                        <img id="lab-preview-img" style="max-height:120px; border-radius:8px; object-fit:cover;" />
+                    </div>
+                </div>
+
+                <!-- TARGET COORDINATES -->
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:11px; font-weight:700; color:var(--text-tertiary); display:block; margin-bottom:4px;">Latitude</label>
+                        <input type="number" step="0.0001" id="lab-lat-input" value="33.7202" style="width:100%; padding:8px 12px; background:var(--bg-glass-inset); border:1px solid var(--border-subtle); border-radius:8px; color:var(--text-primary); font-family:var(--font-mono); font-size:12px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:11px; font-weight:700; color:var(--text-tertiary); display:block; margin-bottom:4px;">Longitude</label>
+                        <input type="number" step="0.0001" id="lab-lon-input" value="73.0898" style="width:100%; padding:8px 12px; background:var(--bg-glass-inset); border:1px solid var(--border-subtle); border-radius:8px; color:var(--text-primary); font-family:var(--font-mono); font-size:12px;">
+                    </div>
+                </div>
+
+                <!-- EXECUTION STATUS CONSOLE -->
+                <div id="lab-execution-console" style="display:none; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:12px; font-family:var(--font-mono); font-size:11px; line-height:1.6; color:var(--primary);">
+                    <div id="lab-console-lines"></div>
+                </div>
+
+                <button class="btn-dock-primary" id="btn-run-lab-ingest" onclick="executeCustomLabIngestion()" style="width:100%; padding:14px; font-size:14px; font-weight:800; background:linear-gradient(135deg, #0071E3 0%, #34C759 100%);">
+                    <i data-lucide="zap" style="width:16px;height:16px;"></i>
+                    <span>Execute End-to-End AI Ingestion</span>
+                </button>
             </div>
         </div>
     </div>
@@ -2627,6 +2727,123 @@
                 showToast('Spatial clustering refreshed!', 'check');
             } catch (e) {
                 console.warn(e);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // LIVE EDGE AI INGESTION LAB CONTROLLERS
+        // ═══════════════════════════════════════════════════════════════
+        function openLiveLabModal() {
+            document.getElementById('lab-modal-scrim').classList.add('active');
+            const center = map.getCenter();
+            if (center) {
+                document.getElementById('lab-lat-input').value = center.lat.toFixed(4);
+                document.getElementById('lab-lon-input').value = center.lng.toFixed(4);
+            }
+            lucide.createIcons();
+        }
+
+        function dismissLabModal() {
+            document.getElementById('lab-modal-scrim').classList.remove('active');
+        }
+
+        let selectedLabBlob = null;
+        let selectedLabFileName = 'sample_pothole.jpg';
+
+        function handleLabFileSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            selectedLabBlob = file;
+            selectedLabFileName = file.name;
+            document.getElementById('lab-file-btn-text').textContent = file.name;
+            const preview = document.getElementById('lab-file-preview');
+            const img = document.getElementById('lab-preview-img');
+            img.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+        }
+
+        async function runPresetIngestion(presetKey) {
+            let lat = 33.7202, lon = 73.0898;
+            if (presetKey === 'crack_isb') { lat = 33.6848; lon = 73.0483; }
+            if (presetKey === 'water_isb') { lat = 33.6524; lon = 73.0815; }
+            document.getElementById('lab-lat-input').value = lat;
+            document.getElementById('lab-lon-input').value = lon;
+            await executeCustomLabIngestion(lat, lon);
+        }
+
+        async function executeCustomLabIngestion(customLat = null, customLon = null) {
+            const consoleEl = document.getElementById('lab-execution-console');
+            const linesEl = document.getElementById('lab-console-lines');
+            const runBtn = document.getElementById('btn-run-lab-ingest');
+            consoleEl.style.display = 'block';
+            linesEl.innerHTML = '';
+            runBtn.disabled = true;
+            runBtn.style.opacity = '0.6';
+
+            function logLine(msg) {
+                const row = document.createElement('div');
+                row.textContent = `> ${msg}`;
+                linesEl.appendChild(row);
+                linesEl.scrollTop = linesEl.scrollHeight;
+            }
+
+            try {
+                const lat = customLat !== null ? customLat : parseFloat(document.getElementById('lab-lat-input').value) || 33.7202;
+                const lon = customLon !== null ? customLon : parseFloat(document.getElementById('lab-lon-input').value) || 73.0898;
+
+                logLine('1/4 Preparing road hazard snapshot payload...');
+                let blob = selectedLabBlob;
+                if (!blob) {
+                    const sampleRes = await fetch('/static/sample_pothole.jpg');
+                    blob = await sampleRes.blob();
+                }
+
+                logLine(`2/4 Ingesting frame to Gateway (POST /v1/ingest/upload) at (${lat.toFixed(4)}, ${lon.toFixed(4)})...`);
+                const formData = new FormData();
+                formData.append('video', blob, selectedLabFileName);
+                formData.append('lat', lat.toString());
+                formData.append('lon', lon.toString());
+
+                const res = await fetch('/v1/ingest/upload', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Server returned HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                logLine(`3/4 Accepted by Gateway! Event ID: #${(data.event_id || '').substring(0, 8)}`);
+                logLine('    Enqueued to Redis Stream "flux:stream:ingest" -> Processing via CV Worker...');
+
+                showToast(`🚀 Telemetry Dispatched! Roboflow AI processing...`, 'zap');
+
+                // Wait 1.4s for worker inference, DB commit & SSE broadcast
+                logLine('4/4 Spatial clustering & live SSE radar broadcast...');
+                await new Promise(r => setTimeout(r, 1400));
+                
+                await fetchTelemetryStats();
+                await loadAllDetections();
+
+                // Smooth map fly-to
+                map.flyTo([lat, lon], 17, { animate: true, duration: 1.2 });
+                spawnSonarAtLatLng(lat, lon, 'Critical');
+
+                showToast('💥 Live AI Ingestion Verified & Centroid Clustered!', 'check-circle');
+
+                setTimeout(() => {
+                    dismissLabModal();
+                    runBtn.disabled = false;
+                    runBtn.style.opacity = '1';
+                    consoleEl.style.display = 'none';
+                }, 1000);
+
+            } catch (err) {
+                logLine(`❌ Error: ${err.message || err}`);
+                showToast(`Ingestion failed: ${err.message || err}`, 'alert-triangle');
+                runBtn.disabled = false;
+                runBtn.style.opacity = '1';
             }
         }
 

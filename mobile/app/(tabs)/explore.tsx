@@ -197,7 +197,7 @@ export default function VideoUploadScreen() {
         const length = Math.min(CHUNK_SIZE, fileSize - offset);
 
         const chunkBase64 = await FileSystem.readAsStringAsync(videoUri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any,
           position: offset,
           length,
         });
@@ -263,6 +263,7 @@ export default function VideoUploadScreen() {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      let tempChunkFile: string | null = null;
       try {
         const formData = new FormData();
         
@@ -276,8 +277,12 @@ export default function VideoUploadScreen() {
           const blob = new Blob([byteArray], { type: 'application/octet-stream' });
           formData.append('chunk', blob, `chunk_${chunkIndex}`);
         } else {
+          tempChunkFile = `${(FileSystem as any).cacheDirectory || ''}chunk_${sessionId}_${chunkIndex}_${attempt}.bin`;
+          await FileSystem.writeAsStringAsync(tempChunkFile, chunkBase64, {
+            encoding: ((FileSystem as any).EncodingType?.Base64 || 'base64') as any,
+          });
           formData.append('chunk', {
-            uri: `data:application/octet-stream;base64,${chunkBase64}`,
+            uri: tempChunkFile,
             name: `chunk_${chunkIndex}`,
             type: 'application/octet-stream',
           } as any);
@@ -292,9 +297,16 @@ export default function VideoUploadScreen() {
           },
         );
 
+        if (tempChunkFile) {
+          await FileSystem.deleteAsync(tempChunkFile, { idempotent: true }).catch(() => {});
+        }
+
         if (res.ok) return;
         throw new Error(`Chunk upload failed: ${res.status}`);
       } catch (e: any) {
+        if (tempChunkFile) {
+          await FileSystem.deleteAsync(tempChunkFile, { idempotent: true }).catch(() => {});
+        }
         lastError = e;
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.pow(2, attempt) * 1000;
@@ -420,6 +432,10 @@ export default function VideoUploadScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   camera: { flex: 1 },
+  webFallback: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#151515' },
+  webFallbackTitle: { color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 40 },
+  webFallbackText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', marginHorizontal: 20, marginTop: 8 },
+  permissionBtn: { marginTop: 12, backgroundColor: '#007AFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
   overlay: { position: 'absolute', top: 60, width: '100%', alignItems: 'center' },
   title: {
     fontSize: 24, fontWeight: 'bold', color: 'white',

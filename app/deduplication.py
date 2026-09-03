@@ -11,23 +11,16 @@ import math
 import uuid
 from datetime import datetime, UTC
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CanonicalPothole, DetectionEvent, PotholeStatus
+from app.severity import compute_severity, escalate_severity
 
 logger = logging.getLogger("deduplication")
 
 # Default radius in meters to consider detections part of the same physical pothole
 DEFAULT_DEDUP_RADIUS_METERS = 10.0
-
-# Severity rank for escalation
-SEVERITY_RANKS = {
-    "low": 1,
-    "medium": 2,
-    "high": 3,
-    "critical": 4,
-}
 
 
 def _normalize_dt(dt: datetime | None) -> datetime:
@@ -62,22 +55,7 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def compute_event_severity(event: DetectionEvent) -> str:
     """Calculate the severity of a single detection event."""
-    sev = "Low"
-    for obj in event.objects:
-        bbox = obj.get("bbox", [0, 0, 0, 0])
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-        area = w * h
-        if area > 0.5:
-            sev = "Critical"
-        elif area > 0.3:
-            sev = "High"
-        elif area > 0.15:
-            sev = "Medium"
-
-    if event.metrics and "severity" in event.metrics:
-        sev = event.metrics["severity"].capitalize()
-    return sev
+    return compute_severity(objects=event.objects, metrics=event.metrics)
 
 
 def compute_event_confidence(event: DetectionEvent) -> float:
@@ -85,15 +63,6 @@ def compute_event_confidence(event: DetectionEvent) -> float:
     if event.objects:
         return float(event.objects[0].get("confidence", 0.8))
     return 0.8
-
-
-def escalate_severity(current_sev: str, new_sev: str) -> str:
-    """Return the highest severity between current and new."""
-    r_cur = SEVERITY_RANKS.get(current_sev.lower(), 1)
-    r_new = SEVERITY_RANKS.get(new_sev.lower(), 1)
-    if r_new > r_cur:
-        return new_sev.capitalize()
-    return current_sev.capitalize()
 
 
 async def cluster_detection(
@@ -237,31 +206,42 @@ async def cluster_detection(
 async def recluster_all_events(
     session: AsyncSession,
     radius_meters: float = DEFAULT_DEDUP_RADIUS_METERS,
+    batch_size: int = 500,
 ) -> int:
-    """Clear all canonical potholes and recluster all processed detection events from scratch."""
+    """Clear all canonical potholes and recluster all processed detection events in memory-bounded batches."""
     # Delete existing canonical potholes so the rebuild starts from scratch
     await session.execute(delete(CanonicalPothole))
-    # Fetch all processed events ordered chronologically
-    stmt = (
-        select(DetectionEvent)
-        .where(
-            DetectionEvent.status == "processed",
-            DetectionEvent.latitude.is_not(None),
-            DetectionEvent.longitude.is_not(None),
-        )
-        .order_by(DetectionEvent.captured_at.asc())
+    await session.execute(
+        update(DetectionEvent).values(canonical_pothole_id=None)
     )
-    result = await session.execute(stmt)
-    events = result.scalars().all()
-
-    # Clear canonical links
-    for ev in events:
-        ev.canonical_pothole_id = None
+    await session.flush()
 
     clustered_count = 0
-    for ev in events:
-        await cluster_detection(session, ev, radius_meters=radius_meters)
-        clustered_count += 1
+    offset = 0
+
+    while True:
+        stmt = (
+            select(DetectionEvent)
+            .where(
+                DetectionEvent.status == "processed",
+                DetectionEvent.latitude.is_not(None),
+                DetectionEvent.longitude.is_not(None),
+            )
+            .order_by(DetectionEvent.captured_at.asc())
+            .offset(offset)
+            .limit(batch_size)
+        )
+        result = await session.execute(stmt)
+        batch = result.scalars().all()
+        if not batch:
+            break
+
+        for ev in batch:
+            await cluster_detection(session, ev, radius_meters=radius_meters)
+            clustered_count += 1
+
+        offset += len(batch)
+        await session.flush()
 
     await session.commit()
     return clustered_count

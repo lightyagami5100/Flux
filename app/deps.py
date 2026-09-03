@@ -45,6 +45,27 @@ async def get_current_device(
     )
 
 
+async def get_upload_device(
+    request: Request,
+    x_api_key: str | None = Security(_api_key_header),
+) -> DeviceIdentity:
+    """Authentication for upload endpoints.
+
+    If Settings.require_upload_auth is False (dev/hackathon), unauthenticated
+    uploads are accepted with a fallback identity ('mobile-anonymous').
+    If True (production), a valid X-API-Key is strictly required.
+    """
+    settings = get_settings()
+    if not settings.require_upload_auth:
+        if x_api_key:
+            for candidate, device_id in settings.api_keys.items():
+                if secrets.compare_digest(candidate.encode(), x_api_key.encode()):
+                    return DeviceIdentity(device_id=device_id)
+        return DeviceIdentity(device_id="mobile-anonymous")
+
+    return await get_current_device(request, x_api_key)
+
+
 def get_redis(request: Request) -> Redis:
     """Connection pool is owned by the app lifespan (see main.py)."""
     return request.app.state.redis

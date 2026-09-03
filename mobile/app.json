@@ -16,7 +16,8 @@
         "NSCameraUsageDescription": "Flux Patrol needs camera access to record road conditions for pothole detection.",
         "NSLocationWhenInUseUsageDescription": "Flux Patrol needs your location to geo-tag road condition reports.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Flux Patrol needs continuous location access to track your patrol route and auto-detect road conditions.",
-        "NSMicrophoneUsageDescription": "Flux Patrol needs microphone access to record audio with road condition videos."
+        "NSMicrophoneUsageDescription": "Flux Patrol needs microphone access to record audio with road condition videos.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

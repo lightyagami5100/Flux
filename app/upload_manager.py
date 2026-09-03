@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import io
 import logging
+import os
+import shutil
 import tempfile
 import time
 import uuid
@@ -105,7 +107,6 @@ class UploadManager:
         content_type: str = "video/mp4",
     ) -> UploadSession:
         """Create a new upload session with sanitized inputs and return its metadata."""
-        import os
         import re
 
         # Security hardening: sanitize filename to prevent path traversal
@@ -141,7 +142,7 @@ class UploadManager:
     # ─── Chunk storage ───────────────────────────────────────────────────
 
     def store_chunk(self, session_id: str, chunk_index: int, data: bytes) -> bool:
-        """Store a single chunk in MinIO. Returns True if stored successfully."""
+        """Store a single chunk in MinIO (or local fallback in dev). Returns True if stored successfully."""
         session = self._sessions.get(session_id)
         if session is None:
             raise ValueError(f"Unknown session: {session_id}")
@@ -151,13 +152,27 @@ class UploadManager:
             )
 
         object_key = self._chunk_key(session_id, chunk_index)
-        self._client.put_object(
-            self.bucket,
-            object_key,
-            io.BytesIO(data),
-            length=len(data),
-            content_type="application/octet-stream",
-        )
+        stored_in_minio = False
+        if self._client:
+            try:
+                self._client.put_object(
+                    self.bucket,
+                    object_key,
+                    io.BytesIO(data),
+                    length=len(data),
+                    content_type="application/octet-stream",
+                )
+                stored_in_minio = True
+            except Exception as e:
+                logger.warning("MinIO put_object failed (%s); using local chunk storage", e)
+
+        if not stored_in_minio:
+            chunk_dir = os.path.join(tempfile.gettempdir(), "flux_chunks", session_id)
+            os.makedirs(chunk_dir, exist_ok=True)
+            chunk_file = os.path.join(chunk_dir, f"{chunk_index:05d}.bin")
+            with open(chunk_file, "wb") as f:
+                f.write(data)
+
         session.received_chunks.add(chunk_index)
         logger.info(
             "stored chunk %d/%d for session %s (%d bytes)",
@@ -168,7 +183,7 @@ class UploadManager:
     # ─── Assembly ────────────────────────────────────────────────────────
 
     def complete_session(self, session_id: str) -> tuple[str, str]:
-        """Assemble all chunks into a single file in MinIO.
+        """Assemble all chunks into a single file in MinIO (or local fallback in dev).
 
         Returns (minio_uri, object_key) of the assembled file.
         Raises ValueError if chunks are missing.
@@ -187,47 +202,94 @@ class UploadManager:
 
         # Reassemble by streaming chunks in order into a temporary file
         final_key = f"uploads/{session_id}/{session.filename}"
-        with tempfile.NamedTemporaryFile(suffix=f"_{session.filename}") as tmp:
+        chunk_dir = os.path.join(tempfile.gettempdir(), "flux_chunks", session_id)
+
+        with tempfile.NamedTemporaryFile(suffix=f"_{session.filename}", delete=False) as tmp:
+            tmp_path = tmp.name
             for i in range(session.total_chunks):
                 chunk_key = self._chunk_key(session_id, i)
-                response = self._client.get_object(self.bucket, chunk_key)
-                try:
-                    while True:
-                        buf = response.read(64 * 1024)
-                        if not buf:
-                            break
-                        tmp.write(buf)
-                finally:
-                    response.close()
-                    response.release_conn()
+                chunk_data: bytes | None = None
+                if self._client:
+                    try:
+                        response = self._client.get_object(self.bucket, chunk_key)
+                        try:
+                            chunk_data = response.read()
+                        finally:
+                            response.close()
+                            response.release_conn()
+                    except Exception:
+                        chunk_data = None
+
+                if chunk_data is None:
+                    local_chunk = os.path.join(chunk_dir, f"{i:05d}.bin")
+                    if os.path.exists(local_chunk):
+                        with open(local_chunk, "rb") as f:
+                            chunk_data = f.read()
+
+                if chunk_data is None:
+                    raise ValueError(f"Could not read chunk {i} for session {session_id}")
+
+                tmp.write(chunk_data)
 
             tmp.flush()
-            assembled_size = tmp.tell()
-            tmp.seek(0)
 
-            # Upload the assembled file
-            self._client.put_object(
-                self.bucket,
-                final_key,
-                tmp,
-                length=assembled_size,
-                content_type=session.content_type,
-            )
+        assembled_size = os.path.getsize(tmp_path)
 
-        # Clean up individual chunk objects
-        for i in range(session.total_chunks):
+        # Try to upload the assembled file to MinIO
+        uploaded_to_minio = False
+        if self._client:
             try:
-                self._client.remove_object(self.bucket, self._chunk_key(session_id, i))
+                with open(tmp_path, "rb") as tmp_file:
+                    self._client.put_object(
+                        self.bucket,
+                        final_key,
+                        tmp_file,
+                        length=assembled_size,
+                        content_type=session.content_type,
+                    )
+                uploaded_to_minio = True
+            except Exception as e:
+                logger.warning("MinIO final upload failed (%s); persisting locally", e)
+
+        # Clean up individual chunk objects / files
+        for i in range(session.total_chunks):
+            if self._client:
+                try:
+                    self._client.remove_object(self.bucket, self._chunk_key(session_id, i))
+                except Exception:
+                    pass
+            local_chunk = os.path.join(chunk_dir, f"{i:05d}.bin")
+            if os.path.exists(local_chunk):
+                try:
+                    os.remove(local_chunk)
+                except Exception:
+                    pass
+
+        if os.path.exists(chunk_dir):
+            try:
+                shutil.rmtree(chunk_dir, ignore_errors=True)
             except Exception:
-                logger.warning("failed to remove chunk %d for session %s", i, session_id)
+                pass
 
         # Remove the session from memory
         del self._sessions[session_id]
 
-        uri = f"minio://{self.bucket}/{final_key}"
+        if uploaded_to_minio:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            uri = f"minio://{self.bucket}/{final_key}"
+        else:
+            final_dir = os.path.join("data", "media", "uploads", session_id)
+            os.makedirs(final_dir, exist_ok=True)
+            local_final = os.path.join(final_dir, session.filename)
+            shutil.move(tmp_path, local_final)
+            uri = f"file://{os.path.abspath(local_final)}"
+
         logger.info(
             "assembled session %s → %s (%d bytes from %d chunks)",
-            session_id, final_key, assembled_size, session.total_chunks,
+            session_id, uri, assembled_size, session.total_chunks,
         )
         return uri, final_key
 
