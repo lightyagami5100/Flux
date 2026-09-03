@@ -239,7 +239,7 @@ cp .env.example .env         # configure production credentials
 The repository strictly enforces two automated quality gates before any change is accepted:
 
 ```bash
-# 1. Run complete pytest test suite (95 tests, all external deps mocked)
+# 1. Run complete pytest test suite (98 tests, all external deps mocked)
 .venv/bin/pytest -q
 
 # 2. Run Ruff linter and import validation
