@@ -147,3 +147,22 @@ def test_upload_auth_enforced_when_required(client: TestClient):
             "longitude": 73.09,
         })
         assert res.status_code == 401
+
+
+def test_upload_rate_limit_enforced(client: TestClient):
+    """Ensure upload rate limit returns 429 when client exceeds request limit."""
+    from unittest.mock import AsyncMock, patch
+    mock_redis = AsyncMock()
+    mock_redis.incr.return_value = 65
+
+    with patch.object(app.state, "redis", mock_redis, create=True):
+        res = client.post("/api/uploads", json={
+            "device_id": "cam-01",
+            "filename": "video.mp4",
+            "total_chunks": 3,
+            "latitude": 33.72,
+            "longitude": 73.09,
+        })
+        assert res.status_code == 429
+        assert "Upload rate limit exceeded" in res.json()["detail"]
+        assert "Retry-After" in res.headers

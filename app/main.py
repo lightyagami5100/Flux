@@ -17,7 +17,7 @@ import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC
-from typing import Annotated
+from typing import Annotated, Any
 
 import redis.asyncio as aioredis
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request, Response, Security, UploadFile, Form, status
@@ -51,7 +51,7 @@ try:
     from minio import Minio
 except ImportError:
     Minio = None  # type: ignore
-from .upload_manager import UploadManager, DEFAULT_CHUNK_SIZE
+from .upload_manager import UploadManager, UploadSession, DEFAULT_CHUNK_SIZE
 from .deduplication import recluster_all_events
 from .metrics import metrics, PrometheusMiddleware
 
@@ -382,17 +382,69 @@ async def ingest_detection(
     return JSONResponse(content=body, status_code=201, headers={"Idempotency-Key": idempotency_key})
 
 
+async def enforce_upload_rate_limit(request: Request | None, client_id: str, limit: int = 60, window_seconds: int = 60) -> None:
+    """Sliding-window rate limiter protecting against Denial-of-Wallet ingestion floods."""
+    if request is None:
+        return
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        return
+    key = f"flux:ratelimit:upload:{client_id}"
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, window_seconds)
+        if count > limit:
+            raise HTTPException(
+                status_code=429,
+                detail="Upload rate limit exceeded. Too many media transmissions; please throttle uploads.",
+                headers={"Retry-After": str(window_seconds)},
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.debug("Rate limit check bypassed gracefully: %s", e)
+
+
+async def _get_or_hydrate_session(mgr: UploadManager, session_id: str, redis: Any = None) -> UploadSession | None:
+    """Retrieve session from local memory, or hydrate from Redis if handled by another pod."""
+    session = mgr.get_session(session_id)
+    if session is not None:
+        return session
+    if redis is None:
+        return None
+    try:
+        raw_data = await redis.get(f"flux:upload:session:{session_id}")
+        if raw_data:
+            session_dict = json.loads(raw_data)
+            chunk_indices = await redis.smembers(f"flux:upload:chunks:{session_id}")
+            if chunk_indices:
+                session_dict["received_chunks"] = [int(x) for x in chunk_indices]
+            hydrated = UploadSession.from_dict(session_dict)
+            mgr.register_session(hydrated)
+            return hydrated
+    except Exception as e:
+        logger.warning("Could not hydrate session %s from Redis: %s", session_id, e)
+    return None
+
+
 @app.post("/v1/ingest/upload", status_code=201)
 async def upload_and_ingest(
+    request: Request,
     video: UploadFile,
     lat: float = Form(...),
     lon: float = Form(...),
-    request: Request = None,
     device: DeviceIdentity = Depends(get_upload_device),
 ):
     import os
     import uuid
     from datetime import datetime
+
+    # Rate-limiting defense against DoW billing attacks
+    client_ip = request.client.host if request and request.client else "unknown"
+    client_id = f"{device.device_id}:{client_ip}"
+    await enforce_upload_rate_limit(request, client_id, limit=60, window_seconds=60)
+
     event_id = uuid.uuid4()
     
     # Upload to MinIO (using settings)
@@ -1022,12 +1074,18 @@ async def seed_data(
     summary="Create a chunked upload session",
 )
 async def create_upload_session(
+    request: Request,
     req: UploadSessionRequest,
     device: DeviceIdentity = Depends(get_upload_device),
 ) -> UploadSessionResponse:
     """Create a new upload session. Returns session_id and upload instructions."""
     mgr: UploadManager = app.state.upload_manager
     dev_id = device.device_id if device.device_id != "mobile-anonymous" else (req.device_id or "mobile-anonymous")
+
+    # Rate limiting protection
+    client_ip = request.client.host if request and request.client else "unknown"
+    await enforce_upload_rate_limit(request, f"{dev_id}:{client_ip}", limit=60, window_seconds=60)
+
     session = mgr.create_session(
         device_id=dev_id,
         filename=req.filename,
@@ -1036,6 +1094,19 @@ async def create_upload_session(
         longitude=req.longitude,
         content_type=req.content_type,
     )
+
+    # Persist session to Redis for multi-pod distributed discovery
+    redis = getattr(app.state, "redis", None)
+    if redis is not None:
+        try:
+            await redis.setex(
+                f"flux:upload:session:{session.session_id}",
+                86400,
+                json.dumps(session.to_dict()),
+            )
+        except Exception as e:
+            logger.warning("Could not sync upload session to Redis: %s", e)
+
     return UploadSessionResponse(
         session_id=session.session_id,
         total_chunks=session.total_chunks,
@@ -1054,16 +1125,23 @@ async def upload_chunk(
     session_id: str,
     chunk_index: int,
     chunk: UploadFile,
+    request: Request,
 ) -> ChunkUploadResponse:
     """Upload chunk N for a given upload session."""
     mgr: UploadManager = app.state.upload_manager
-    session = mgr.get_session(session_id)
+    redis = getattr(app.state, "redis", None)
+    session = await _get_or_hydrate_session(mgr, session_id, redis)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
 
     try:
         data = await chunk.read()
         mgr.store_chunk(session_id, chunk_index, data)
+        if redis is not None:
+            try:
+                await redis.sadd(f"flux:upload:chunks:{session_id}", chunk_index)
+            except Exception:
+                pass
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -1089,12 +1167,18 @@ async def complete_upload(
 ) -> CompleteUploadResponse:
     """Assemble chunks into a final file and push an ingest event to Redis."""
     mgr: UploadManager = app.state.upload_manager
-    session = mgr.get_session(session_id)
+    redis = getattr(request.app.state, "redis", None)
+    session = await _get_or_hydrate_session(mgr, session_id, redis)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
 
     try:
         media_uri, object_key = mgr.complete_session(session_id)
+        if redis is not None:
+            try:
+                await redis.delete(f"flux:upload:session:{session_id}", f"flux:upload:chunks:{session_id}")
+            except Exception:
+                pass
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -1144,7 +1228,8 @@ async def complete_upload(
 async def cancel_upload(session_id: str):
     """Cancel an in-progress upload session and clean up its chunks."""
     mgr: UploadManager = app.state.upload_manager
-    session = mgr.get_session(session_id)
+    redis = getattr(app.state, "redis", None)
+    session = await _get_or_hydrate_session(mgr, session_id, redis)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
 
@@ -1155,6 +1240,11 @@ async def cancel_upload(session_id: str):
         except Exception:
             pass
     del mgr._sessions[session_id]
+    if redis is not None:
+        try:
+            await redis.delete(f"flux:upload:session:{session_id}", f"flux:upload:chunks:{session_id}")
+        except Exception:
+            pass
     return {"status": "cancelled", "session_id": session_id}
 
 

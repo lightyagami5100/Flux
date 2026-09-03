@@ -47,9 +47,44 @@ class UploadSession:
     received_chunks: set[int] = field(default_factory=set)
     created_at: float = field(default_factory=time.time)
 
+    def to_dict(self) -> dict[str, object]:
+        """Serialize session metadata for distributed stores (e.g. Redis)."""
+        return {
+            "session_id": self.session_id,
+            "device_id": self.device_id,
+            "filename": self.filename,
+            "total_chunks": self.total_chunks,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "content_type": self.content_type,
+            "received_chunks": sorted(self.received_chunks),
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> UploadSession:
+        """Hydrate an UploadSession from serialized dictionary representation."""
+        received = data.get("received_chunks", [])
+        received_set = set(int(x) for x in received) if isinstance(received, (list, set, tuple)) else set()
+        return cls(
+            session_id=str(data["session_id"]),
+            device_id=str(data["device_id"]),
+            filename=str(data["filename"]),
+            total_chunks=int(data["total_chunks"]),
+            latitude=float(data["latitude"]),
+            longitude=float(data["longitude"]),
+            content_type=str(data.get("content_type", "video/mp4")),
+            received_chunks=received_set,
+            created_at=float(data.get("created_at", time.time())),
+        )
+
 
 class UploadManager:
     """Manages chunked uploads with MinIO as the backing store."""
+
+    def register_session(self, session: UploadSession) -> None:
+        """Register or update an existing session in the local registry."""
+        self._sessions[session.session_id] = session
 
     def __init__(
         self,

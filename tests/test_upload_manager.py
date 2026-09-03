@@ -190,3 +190,39 @@ class TestCleanupStale:
         cleaned = manager.cleanup_stale()
         assert cleaned == 0
         assert manager.get_session(session.session_id) is not None
+
+
+class TestSerializationAndHydration:
+    def test_to_dict_and_from_dict_roundtrip(self):
+        session = UploadSession(
+            session_id="sess-123",
+            device_id="cam-01",
+            filename="front_cam.mp4",
+            total_chunks=10,
+            latitude=33.7200,
+            longitude=73.0900,
+            content_type="video/mp4",
+            received_chunks={0, 1, 2},
+            created_at=1000000.0,
+        )
+        data = session.to_dict()
+        assert data["session_id"] == "sess-123"
+        assert data["received_chunks"] == [0, 1, 2]
+
+        restored = UploadSession.from_dict(data)
+        assert restored.session_id == session.session_id
+        assert restored.device_id == session.device_id
+        assert restored.received_chunks == {0, 1, 2}
+        assert restored.latitude == 33.7200
+
+    def test_manager_register_session(self, manager):
+        session = UploadSession(
+            session_id="hydrated-sess",
+            device_id="cam-02",
+            filename="dash.mp4",
+            total_chunks=5,
+            latitude=31.52,
+            longitude=74.35,
+        )
+        manager.register_session(session)
+        assert manager.get_session("hydrated-sess") is session

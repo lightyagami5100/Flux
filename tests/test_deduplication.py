@@ -158,6 +158,48 @@ class TestSpatialClusteringEngine:
         assert len(pothole.observations) == 2
         assert new_ev.canonical_pothole_id == pothole.pothole_id
 
+    @pytest.mark.anyio
+    async def test_observations_capped_to_max_inline(self):
+        """Observations list is capped to 50 items to prevent database row bloat."""
+        existing_pothole = CanonicalPothole(
+            pothole_id=uuid.uuid4(),
+            latitude=33.72000,
+            longitude=73.09000,
+            severity="Low",
+            status=PotholeStatus.ACTIVE,
+            observation_count=55,
+            avg_confidence=0.85,
+            first_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
+            last_detected_at=datetime(2026, 8, 25, 10, 0, 0, tzinfo=UTC),
+            primary_media_uri="minio://test/img1.jpg",
+            observations=[{"obs": i} for i in range(55)],
+        )
+
+        new_ev = DetectionEvent(
+            event_id=uuid.uuid4(),
+            device_id="mobile_2",
+            captured_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=UTC),
+            received_at=datetime(2026, 8, 25, 10, 5, 0, tzinfo=UTC),
+            status=DetectionStatus.PROCESSED,
+            media_kind="image",
+            media_uri="minio://test/img2.jpg",
+            latitude=33.72001,
+            longitude=73.09001,
+            object_count=1,
+            objects=[{"label": "pothole", "confidence": 0.90, "bbox": [0.1, 0.1, 0.3, 0.3]}],
+            metrics={"severity": "Medium"},
+        )
+
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [existing_pothole]
+        mock_session.execute.return_value = mock_result
+
+        pothole, is_new = await cluster_detection(mock_session, new_ev, radius_meters=10.0)
+        assert is_new is False
+        assert pothole.observation_count == 56
+        assert len(pothole.observations) == 50
+
 
 class TestRebuildAgainstSQLite:
     """recluster_all_events against a real SQLite bind (the Docker-less fallback)."""

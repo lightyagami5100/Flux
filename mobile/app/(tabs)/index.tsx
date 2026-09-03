@@ -27,6 +27,7 @@ export default function TabOneScreen() {
   const [serverHost, setServerHost] = useState(defaultHost);
   const [isEditingHost, setIsEditingHost] = useState(false);
   const [tempHost, setTempHost] = useState(defaultHost);
+  const [isOledStandby, setIsOledStandby] = useState(false);
 
   const getBackendUrl = () => {
     const clean = serverHost.trim();
@@ -336,7 +337,7 @@ export default function TabOneScreen() {
             onPress={togglePatrol}
           >
             <Text style={styles.subButtonText}>
-              {isPatrolling ? '⏹ Stop Patrol' : '🚗 Start Auto-Patrol'}
+              {isPatrolling ? '⏹ Stop Patrol' : '🚗 Auto-Patrol'}
             </Text>
           </TouchableOpacity>
 
@@ -348,6 +349,13 @@ export default function TabOneScreen() {
             }}
           >
             <Text style={styles.subButtonText}>💥 Trigger Bump</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subButton, { backgroundColor: '#1C1C1E', borderColor: '#3A3A3C', borderWidth: 1 }]}
+            onPress={() => setIsOledStandby(true)}
+          >
+            <Text style={styles.subButtonText}>🌙 OLED Saver</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -393,6 +401,31 @@ export default function TabOneScreen() {
       </Modal>
     </>
   );
+
+  if (isOledStandby) {
+    return (
+      <TouchableOpacity
+        style={[styles.container, { backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center', padding: 24 }]}
+        activeOpacity={1}
+        onPress={() => setIsOledStandby(false)}
+      >
+        <View style={{ alignItems: 'center', gap: 14 }}>
+          <Text style={{ fontSize: 40 }}>🌙</Text>
+          <Text style={{ color: '#34C759', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 }}>
+            OLED Battery Saver Active
+          </Text>
+          <Text style={{ color: '#8E8E93', fontSize: 13, textAlign: 'center', maxWidth: 290, lineHeight: 18 }}>
+            {isPatrolling
+              ? 'Auto-Patrol armed (10 Hz). Windshield thermal protection on.'
+              : 'Sensor standby mode. Tap anywhere to return to viewfinder.'}
+          </Text>
+          <View style={{ marginTop: 24, paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#1C1C1E', borderRadius: 24, borderWidth: 1, borderColor: '#3A3A3C' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>Tap anywhere to wake ⚡</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View style={styles.container}>

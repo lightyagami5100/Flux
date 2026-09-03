@@ -167,8 +167,13 @@ async def cluster_detection(
             pothole.primary_media_uri = event.media_uri
             pothole.primary_event_id = event.event_id
 
-        # Update observations list
-        pothole.observations = list(pothole.observations) + [obs_record]
+        # Update observations list (capped to 50 most recent to prevent DB row bloat)
+        MAX_INLINE_OBSERVATIONS = 50
+        current_obs = list(pothole.observations or [])
+        current_obs.append(obs_record)
+        if len(current_obs) > MAX_INLINE_OBSERVATIONS:
+            current_obs = current_obs[-MAX_INLINE_OBSERVATIONS:]
+        pothole.observations = current_obs
         event.canonical_pothole_id = pothole.pothole_id
 
         logger.info(

@@ -15,7 +15,7 @@ Patrol phones record road conditions and detect surface impacts. An asynchronous
 ![Redis Streams](https://img.shields.io/badge/Redis-Streams%20%26%20PubSub-DC382D?logo=redis&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-95%20passed-success?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-98%20passed-success?logo=pytest&logoColor=white)
 
 </div>
 
@@ -88,7 +88,7 @@ Cities contain thousands of kilometers of roadway with no continuous, cost-effec
 | [`static/index.html`](static/index.html) | High-performance Leaflet command center: visionOS Liquid Quartz & Obsidian Pro dark theme, Defect Profile Drawer, Live AI Ingestion Lab |
 | [`mobile/`](mobile/) | React Native / Expo patrol client: Smart Patrol (accelerometer-triggered) and Video Patrol (chunked transfer) |
 | [`infra/`](infra/) | Docker Compose topologies (dev and production) + hardened Nginx reverse proxy |
-| [`tests/`](tests/) | Comprehensive pytest suite (95 tests), fully mocked external APIs, zero cost to test |
+| [`tests/`](tests/) | Comprehensive pytest suite (98 tests), fully mocked external APIs, zero cost to test |
 
 ---
 

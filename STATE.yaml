@@ -28,7 +28,7 @@ repo_map:
   tests/test_severity.py: [test_severity_ranks, test_compute_severity_default, test_compute_severity_from_bbox, test_compute_severity_metrics_override, test_escalate_severity, test_extract_class_label]
   tests/test_visualization_module.py: [test_render_road_snapshot_svg_classes]
 active_bugs: {}
-completed_milestones: [MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013, MS-014, MS-015, MS-016]
+completed_milestones: [MS-007, MS-008, MS-009, MS-010, MS-011, MS-012, MS-013, MS-014, MS-015, MS-016, MS-017]
 assumptions:
   - "DETECTION_TARGET: 'potholes'"
   - "MAP_MARKER_MEANING: 'one marker per canonical pothole entity (deduplicated across multi-pass recordings)'"
@@ -50,4 +50,7 @@ assumptions:
   - "SQLITE_FOR_UPDATE: 'SQLAlchemy 2.0.52 compiles FOR UPDATE to a no-op on SQLite, so the guard in cluster_detection is defensive, not a crash fix (verified)'"
   - "REALTIME_SSE: 'Worker publishes to Redis pub/sub channel flux:events:live after inference; SSE endpoint subscribes (instant) with DB poll fallback'"
   - "DASHBOARD_WOW: 'sonar pulse on new detections, severity-colored toasts, animated KPI counters, live event count badge'"
-next_action: "Build iOS app via EAS (requires Apple Developer credentials); push to origin."
+  - "SESSION_SYNC: 'UploadManager session hydration via Redis ensures seamless multi-pod horizontal scaling'"
+  - "RATE_LIMITING: 'Sliding-window Redis rate limiter on upload endpoints prevents DoW external API billing exhaustion'"
+  - "OBSERVATION_CAP: 'Inline canonical observations list capped to 50 items to eliminate PostgreSQL TOAST row bloat'"
+next_action: "Push hardened MS-017 changes to origin/main."
