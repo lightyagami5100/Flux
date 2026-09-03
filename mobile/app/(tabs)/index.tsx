@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Platform, TextInput, Modal } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert, Platform, TextInput, Modal, AppState, AppStateStatus } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
@@ -28,6 +28,7 @@ export default function TabOneScreen() {
   const [isEditingHost, setIsEditingHost] = useState(false);
   const [tempHost, setTempHost] = useState(defaultHost);
   const [isOledStandby, setIsOledStandby] = useState(false);
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
 
   const getBackendUrl = () => {
     const clean = serverHost.trim();
@@ -46,8 +47,19 @@ export default function TabOneScreen() {
         console.warn('Location permission check error:', e);
       }
     })();
+
+    const appStateSub = AppState.addEventListener('change', nextState => {
+      setAppState(nextState);
+      if (nextState.match(/inactive|background/)) {
+        setStatusMsg('Background mode active — Sensors & GPS armed');
+      } else if (nextState === 'active') {
+        setStatusMsg('Patrol active — monitoring road bumps');
+      }
+    });
+
     return () => {
       _unsubscribe();
+      appStateSub.remove();
     };
   }, []);
 
@@ -114,8 +126,8 @@ export default function TabOneScreen() {
         console.warn('Could not get GPS, using fallback coordinates:', err);
       }
       
-      // 2. Capture a photo from camera
-      if (cameraRef.current) {
+      // 2. Capture a photo from camera (only when visible in foreground or split-screen)
+      if (cameraRef.current && appState === 'active') {
         try {
           const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
           if (photo && photo.uri) {
@@ -127,7 +139,7 @@ export default function TabOneScreen() {
         }
       }
 
-      // Fallback: 1x1 test JPEG if camera unavailable
+      // Fallback: when camera unavailable or app running in background behind Google Maps/Delivery apps
       await uploadSyntheticFrame(lat, lon);
     } catch (e: any) {
       console.error('Error during capture:', e);

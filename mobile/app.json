@@ -17,7 +17,11 @@
         "NSLocationWhenInUseUsageDescription": "Flux Patrol needs your location to geo-tag road condition reports.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Flux Patrol needs continuous location access to track your patrol route and auto-detect road conditions.",
         "NSMicrophoneUsageDescription": "Flux Patrol needs microphone access to record audio with road condition videos.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -37,6 +41,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
         "INTERNET",
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
